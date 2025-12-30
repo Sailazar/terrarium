@@ -13,7 +13,9 @@
 
 struct Node {
     Vector3 position;
-    std::vector<int> connections;
+    std::vector<int> connections; // Local connections within same module
+    std::vector<std::pair<int, int>> crossModuleConnections; // {moduleIndex, nodeIndex}
+    float scale; // Visual scale of the node sphere
 };
 
 struct Wall {
@@ -32,6 +34,11 @@ struct GridModule {
 struct AppState {
     std::vector<GridModule> modules;
     int nextModuleId;
+};
+
+struct NodeSelection {
+    int moduleIdx;
+    int nodeIdx;
 };
 
 std::vector<Node> Create3DGridStructure(Vector3 center, float totalSize, int gridDimension) {
@@ -179,27 +186,50 @@ void CreateWallFromSelectedNodes(GridModule& module, const std::vector<int>& sel
     module.walls.push_back(newWall);
 }
 
-void DeleteNode(GridModule& module, int nodeIdx) {
+void DeleteNode(std::vector<GridModule>& modules, int moduleIdx, int nodeIdx) {
+    if (moduleIdx < 0 || moduleIdx >= (int)modules.size()) return;
+    GridModule& module = modules[moduleIdx];
     if (nodeIdx < 0 || nodeIdx >= (int)module.nodes.size()) return;
-    
+
     for (auto& node : module.nodes) {
         node.connections.erase(std::remove(node.connections.begin(), node.connections.end(), nodeIdx), node.connections.end());
         for (auto& conn : node.connections) {
             if (conn > nodeIdx) conn--;
         }
     }
-    
+
+    for (size_t m = 0; m < modules.size(); m++) {
+        if ((int)m == moduleIdx) continue;
+        for (auto& node : modules[m].nodes) {
+            node.crossModuleConnections.erase(
+                std::remove_if(node.crossModuleConnections.begin(), node.crossModuleConnections.end(),
+                    [moduleIdx, nodeIdx](const std::pair<int,int>& p){ return p.first == moduleIdx && p.second == nodeIdx; }),
+                node.crossModuleConnections.end());
+
+            for (auto& p : node.crossModuleConnections) {
+                if (p.first == moduleIdx && p.second > nodeIdx) p.second--;
+            }
+        }
+    }
+
     module.walls.erase(std::remove_if(module.walls.begin(), module.walls.end(),
         [nodeIdx](const Wall& w) {
             return std::find(w.nodeIndices.begin(), w.nodeIndices.end(), nodeIdx) != w.nodeIndices.end();
         }), module.walls.end());
-    
+
     for (auto& wall : module.walls) {
         for (auto& idx : wall.nodeIndices) {
             if (idx > nodeIdx) idx--;
         }
     }
-    
+
+    for (auto& node : module.nodes) {
+        node.crossModuleConnections.erase(
+            std::remove_if(node.crossModuleConnections.begin(), node.crossModuleConnections.end(),
+                [moduleIdx, nodeIdx](const std::pair<int,int>& p){ return p.first == moduleIdx && p.second == nodeIdx; }),
+            node.crossModuleConnections.end());
+    }
+
     module.nodes.erase(module.nodes.begin() + nodeIdx);
 }
 
@@ -428,6 +458,19 @@ bool ExportToOBJ(const std::vector<GridModule>& modules, const char* filename) {
                     file << "l " << v1 << " " << v2 << "\n";
                 }
             }
+            for (const auto& crossConn : modules[m].nodes[i].crossModuleConnections) {
+                 int targetMod = crossConn.first;
+                 int targetNode = crossConn.second;
+                 
+                 int targetVertexOffset = 1;
+                 for(int k=0; k<targetMod; k++) targetVertexOffset += modules[k].nodes.size();
+                 
+                 if ((int)m < targetMod) {
+                     int v1 = vertexOffset + (int)i;
+                     int v2 = targetVertexOffset + targetNode;
+                     file << "l " << v1 << " " << v2 << "\n";
+                 }
+            }
         }
         vertexOffset += (int)modules[m].nodes.size();
     }
@@ -459,10 +502,8 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         return false;
     }
     
-    // Clear existing modules
     modules.clear();
     
-    // Create a single module to hold all imported data
     GridModule newModule;
     newModule.id = nextModuleId++;
     newModule.center = {0.0f, 0.0f, 0.0f};
@@ -480,23 +521,20 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         iss >> type;
         
         if (type == "v") {
-            // Vertex
             float x, y, z;
             iss >> x >> y >> z;
             vertices.push_back({x, y, z});
         }
         else if (type == "l") {
-            // Line (connection)
             int v1, v2;
             iss >> v1 >> v2;
-            lines.push_back({v1 - 1, v2 - 1}); // OBJ indices start at 1
+            lines.push_back({v1 - 1, v2 - 1});
         }
         else if (type == "f") {
-            // Face (wall)
             std::vector<int> faceIndices;
             int idx;
             while (iss >> idx) {
-                faceIndices.push_back(idx - 1); // OBJ indices start at 1
+                faceIndices.push_back(idx - 1);
             }
             if (faceIndices.size() >= 3) {
                 faces.push_back(faceIndices);
@@ -511,19 +549,16 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         return false;
     }
     
-    // Create nodes from vertices
     for (const auto& v : vertices) {
         Node node;
         node.position = v;
         newModule.nodes.push_back(node);
     }
     
-    // Create connections from lines
     for (const auto& l : lines) {
         if (l.first >= 0 && l.first < (int)newModule.nodes.size() &&
             l.second >= 0 && l.second < (int)newModule.nodes.size()) {
             
-            // Check if connection already exists
             bool exists = false;
             for (int conn : newModule.nodes[l.first].connections) {
                 if (conn == l.second) {
@@ -539,7 +574,6 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         }
     }
     
-    // Create walls from faces
     for (const auto& f : faces) {
         bool validFace = true;
         for (int idx : f) {
@@ -558,7 +592,6 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         }
     }
     
-    // Calculate center
     if (!newModule.nodes.empty()) {
         Vector3 sum = {0, 0, 0};
         for (const auto& node : newModule.nodes) {
@@ -580,9 +613,9 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
 }
 
 int main() {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);  // Make window resizable
-    InitWindow(1200, 900, "3D Grid Modules - Smart ESC Key");
-    SetExitKey(KEY_NULL); // Disable ESC from closing window automatically
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(1200, 900, "3D Grid Modules - Cross-Module Walls");
+    SetExitKey(KEY_NULL);
     SetTargetFPS(60);
 
     int gridSize = 3;
@@ -617,11 +650,10 @@ int main() {
     Vector3 lastMouseWorld = {0.0f, 0.0f, 0.0f};
     int gridSlices = 20;
     
-    enum Mode { MODE_SELECT, MODE_MOVE_VERTEX, MODE_MOVE_MODULE, MODE_ADD_NODE, MODE_CONNECT };
+    enum Mode { MODE_SELECT, MODE_MOVE_VERTEX, MODE_MOVE_MODULE, MODE_ADD_NODE, MODE_CONNECT, MODE_ROTATE_MODULE, MODE_SCALE };
     Mode currentMode = MODE_SELECT;
     
-    std::vector<int> selectedNodes;
-    int selectedModule = -1;
+    std::vector<NodeSelection> selectedNodes;
     int activeModule = -1;
     
     Vector3 previewNodePosition = {0.0f, 0.0f, 0.0f};
@@ -630,6 +662,15 @@ int main() {
     
     int connectStartNode = -1;
     int connectStartModule = -1;
+    
+    double lastClickTime = 0.0;
+    int lastClickedNode = -1;
+    int lastClickedModule = -1;
+    const double doubleClickTime = 0.3;
+    
+    bool isDragSelecting = false;
+    Vector2 dragSelectStart = {0, 0};
+    Vector2 dragSelectEnd = {0, 0};
     
     int escPressCount = 0;
     double lastEscTime = 0.0;
@@ -661,11 +702,6 @@ int main() {
                     hadSomethingToCancel = true;
                     escMessage = "Selection cleared";
                 }
-                else if (selectedModule != -1) {
-                    selectedModule = -1;
-                    hadSomethingToCancel = true;
-                    escMessage = "Module deselected";
-                }
                 else if (activeModule != -1) {
                     activeModule = -1;
                     hadSomethingToCancel = true;
@@ -694,7 +730,6 @@ int main() {
             cursorEnabled ? EnableCursor() : DisableCursor();
         }
         
-        // Toggle maximized window with F11
         if (IsKeyPressed(KEY_F11)) {
             if (IsWindowMaximized()) {
                 RestoreWindow();
@@ -710,7 +745,6 @@ int main() {
             currentMode = MODE_SELECT;
             isDragging = isDraggingModule = false;
             selectedNodes.clear();
-            selectedModule = -1;
             showPreviewNode = false;
             connectStartNode = connectStartModule = -1;
         }
@@ -718,7 +752,6 @@ int main() {
             currentMode = MODE_MOVE_VERTEX;
             isDragging = isDraggingModule = false;
             selectedNodes.clear();
-            selectedModule = -1;
             showPreviewNode = false;
             connectStartNode = connectStartModule = -1;
         }
@@ -726,7 +759,6 @@ int main() {
             currentMode = MODE_MOVE_MODULE;
             isDragging = isDraggingModule = false;
             selectedNodes.clear();
-            selectedModule = -1;
             showPreviewNode = false;
             connectStartNode = connectStartModule = -1;
         }
@@ -734,7 +766,6 @@ int main() {
             currentMode = MODE_ADD_NODE;
             isDragging = isDraggingModule = false;
             selectedNodes.clear();
-            selectedModule = -1;
             showPreviewNode = true;
             connectStartNode = connectStartModule = -1;
         }
@@ -742,31 +773,162 @@ int main() {
             currentMode = MODE_CONNECT;
             isDragging = isDraggingModule = false;
             selectedNodes.clear();
-            selectedModule = -1;
+            showPreviewNode = false;
+            connectStartNode = connectStartModule = -1;
+        }
+        if (cursorEnabled && IsKeyPressed(KEY_SIX)) {
+            currentMode = MODE_ROTATE_MODULE;
+            isDragging = isDraggingModule = false;
+            selectedNodes.clear();
+            showPreviewNode = false;
+            connectStartNode = connectStartModule = -1;
+        }
+        if (cursorEnabled && IsKeyPressed(KEY_SEVEN)) {
+            currentMode = MODE_SCALE;
+            isDragging = isDraggingModule = false;
             showPreviewNode = false;
             connectStartNode = connectStartModule = -1;
         }
         
-        if (currentMode == MODE_SELECT && IsKeyPressed(KEY_SPACE) && selectedNodes.size() >= 3 && selectedModule != -1) {
-            CreateWallFromSelectedNodes(modules[selectedModule], selectedNodes);
-            SaveState(undoHistory, modules, nextModuleId);
-            selectedNodes.clear();
-            selectedModule = -1;
+        // SPACE key for wall creation with cross-module support
+        if (currentMode == MODE_SELECT && IsKeyPressed(KEY_SPACE) && selectedNodes.size() >= 3) {
+            std::vector<Vector3> positions;
+            for (const auto& sel : selectedNodes) {
+                positions.push_back(modules[sel.moduleIdx].nodes[sel.nodeIdx].position);
+            }
+            
+            Vector3 p1 = positions[0];
+            Vector3 p2 = positions[1];
+            Vector3 p3 = positions[2];
+            
+            Vector3 v1 = Vector3Subtract(p2, p1);
+            Vector3 v2 = Vector3Subtract(p3, p1);
+            Vector3 normal = Vector3Normalize(Vector3CrossProduct(v1, v2));
+            
+            bool coplanar = true;
+            for (size_t i = 3; i < positions.size(); i++) {
+                Vector3 v3 = Vector3Subtract(positions[i], p1);
+                float dot = fabs(Vector3DotProduct(normal, v3));
+                if (dot > 1.0f) {
+                    coplanar = false;
+                    break;
+                }
+            }
+            
+            if (coplanar) {
+                int targetModule = selectedNodes[0].moduleIdx;
+                
+                bool allSameModule = true;
+                for (const auto& sel : selectedNodes) {
+                    if (sel.moduleIdx != targetModule) {
+                        allSameModule = false;
+                        break;
+                    }
+                }
+                
+                if (allSameModule) {
+                    Wall newWall;
+                    for (const auto& sel : selectedNodes) {
+                        newWall.nodeIndices.push_back(sel.nodeIdx);
+                    }
+                    newWall.hasTexture = false;
+                    newWall.texture = {};
+                    modules[targetModule].walls.push_back(newWall);
+                    SaveState(undoHistory, modules, nextModuleId);
+                    printf("Created wall with %zu nodes in module %d\n", newWall.nodeIndices.size(), targetModule);
+                } else {
+                    std::vector<int> wallNodeIndices;
+                    
+                    for (const auto& sel : selectedNodes) {
+                        if (sel.moduleIdx == targetModule) {
+                            wallNodeIndices.push_back(sel.nodeIdx);
+                        } else {
+                            Node newNode = modules[sel.moduleIdx].nodes[sel.nodeIdx];
+                            modules[targetModule].nodes.push_back(newNode);
+                            int newIdx = (int)modules[targetModule].nodes.size() - 1;
+                            wallNodeIndices.push_back(newIdx);
+                            
+                            modules[targetModule].nodes[newIdx].crossModuleConnections.push_back({sel.moduleIdx, sel.nodeIdx});
+                            modules[sel.moduleIdx].nodes[sel.nodeIdx].crossModuleConnections.push_back({targetModule, newIdx});
+                        }
+                    }
+                    
+                    Wall newWall;
+                    newWall.nodeIndices = wallNodeIndices;
+                    newWall.hasTexture = false;
+                    newWall.texture = {};
+                    modules[targetModule].walls.push_back(newWall);
+                    SaveState(undoHistory, modules, nextModuleId);
+                    printf("Created cross-module wall with %zu nodes in module %d\n", wallNodeIndices.size(), targetModule);
+                }
+                
+                selectedNodes.clear();
+            } else {
+                printf("Selected nodes are not coplanar - cannot create wall\n");
+            }
         }
         
-        // Clone module in SELECT mode (Ctrl+D or Ctrl+C)
+        // Clone module/selection
         if (currentMode == MODE_SELECT && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))) {
             if (IsKeyPressed(KEY_D) || IsKeyPressed(KEY_C)) {
-                if (activeModule != -1 && activeModule < (int)modules.size()) {
-                    // Clone the active module
+                if (!selectedNodes.empty()) {
+                    GridModule clonedModule;
+                    clonedModule.id = nextModuleId++;
+                    
+                    std::vector<std::pair<NodeSelection, int>> nodeMapping;
+                    
+                    Vector3 selectionCenter = {0, 0, 0};
+                    for (const auto& sel : selectedNodes) {
+                        selectionCenter.x += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.x;
+                        selectionCenter.y += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.y;
+                        selectionCenter.z += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.z;
+                    }
+                    selectionCenter.x /= selectedNodes.size();
+                    selectionCenter.y /= selectedNodes.size();
+                    selectionCenter.z /= selectedNodes.size();
+                    
+                    Vector3 offset = {5.0f, 0.0f, 0.0f};
+                    for (size_t i = 0; i < selectedNodes.size(); i++) {
+                        NodeSelection sel = selectedNodes[i];
+                        Node newNode = modules[sel.moduleIdx].nodes[sel.nodeIdx];
+                        newNode.position = Vector3Add(newNode.position, offset);
+                        newNode.connections.clear();
+                        newNode.crossModuleConnections.clear();
+                        
+                        nodeMapping.push_back({sel, (int)i});
+                        clonedModule.nodes.push_back(newNode);
+                    }
+                    
+                    for (size_t i = 0; i < selectedNodes.size(); i++) {
+                        NodeSelection sel = selectedNodes[i];
+                        const Node& originalNode = modules[sel.moduleIdx].nodes[sel.nodeIdx];
+                        
+                        for (int conn : originalNode.connections) {
+                            for (const auto& mapping : nodeMapping) {
+                                if (mapping.first.moduleIdx == sel.moduleIdx && mapping.first.nodeIdx == conn) {
+                                    clonedModule.nodes[i].connections.push_back(mapping.second);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    clonedModule.center = Vector3Add(selectionCenter, offset);
+                    modules.push_back(clonedModule);
+                    SaveState(undoHistory, modules, nextModuleId);
+                    
+                    printf("Cloned %zu selected nodes as new module %d\n", 
+                           selectedNodes.size(), clonedModule.id);
+                    
+                    selectedNodes.clear();
+                }
+                else if (activeModule != -1 && activeModule < (int)modules.size()) {
                     GridModule clonedModule = modules[activeModule];
                     clonedModule.id = nextModuleId++;
                     
-                    // Offset the cloned module position
                     Vector3 offset = {10.0f, 0.0f, 0.0f};
                     clonedModule.center = Vector3Add(clonedModule.center, offset);
                     
-                    // Offset all node positions
                     for (auto& node : clonedModule.nodes) {
                         node.position = Vector3Add(node.position, offset);
                     }
@@ -776,7 +938,7 @@ int main() {
                     
                     printf("Module %d cloned as module %d\n", activeModule, clonedModule.id);
                 } else {
-                    printf("No active module to clone. Click on a module to activate it first.\n");
+                    printf("No selection or active module to clone\n");
                 }
             }
         }
@@ -809,17 +971,14 @@ int main() {
             }
         }
         
-        // Import OBJ file (Ctrl+O or F6)
         if ((IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) && IsKeyPressed(KEY_O)) {
             const char* filename = "model.obj";
             if (ImportFromOBJ(modules, nextModuleId, filename)) {
                 printf("Model imported from %s\n", filename);
                 SaveState(undoHistory, modules, nextModuleId);
-                // Reset view
                 hoveredNode = hoveredModule = hoveredWall = -1;
                 isDragging = isDraggingModule = false;
                 selectedNodes.clear();
-                selectedModule = -1;
                 activeModule = -1;
             } else {
                 printf("Failed to import model from %s\n", filename);
@@ -834,7 +993,6 @@ int main() {
                 hoveredNode = hoveredModule = hoveredWall = -1;
                 isDragging = isDraggingModule = false;
                 selectedNodes.clear();
-                selectedModule = -1;
                 activeModule = -1;
             } else {
                 printf("Failed to import model from %s\n", filename);
@@ -846,7 +1004,6 @@ int main() {
                 hoveredNode = hoveredModule = hoveredWall = -1;
                 isDragging = isDraggingModule = false;
                 selectedNodes.clear();
-                selectedModule = -1;
                 activeModule = -1;
             }
         }
@@ -881,12 +1038,79 @@ int main() {
                 moved = true;
             }
             
+            bool rotated = false;
+            float rotationAngle = 15.0f * DEG2RAD;
+            
+            if (IsKeyDown(KEY_R)) {
+                Vector3 center = modules[activeModule].center;
+                
+                if (IsKeyPressed(KEY_LEFT)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float x = offset.x * cos(rotationAngle) - offset.z * sin(rotationAngle);
+                        float z = offset.x * sin(rotationAngle) + offset.z * cos(rotationAngle);
+                        node.position = Vector3Add(center, {x, offset.y, z});
+                    }
+                    rotated = true;
+                }
+                if (IsKeyPressed(KEY_RIGHT)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float x = offset.x * cos(-rotationAngle) - offset.z * sin(-rotationAngle);
+                        float z = offset.x * sin(-rotationAngle) + offset.z * cos(-rotationAngle);
+                        node.position = Vector3Add(center, {x, offset.y, z});
+                    }
+                    rotated = true;
+                }
+                if (IsKeyPressed(KEY_UP)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float y = offset.y * cos(rotationAngle) - offset.z * sin(rotationAngle);
+                        float z = offset.y * sin(rotationAngle) + offset.z * cos(rotationAngle);
+                        node.position = Vector3Add(center, {offset.x, y, z});
+                    }
+                    rotated = true;
+                }
+                if (IsKeyPressed(KEY_DOWN)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float y = offset.y * cos(-rotationAngle) - offset.z * sin(-rotationAngle);
+                        float z = offset.y * sin(-rotationAngle) + offset.z * cos(-rotationAngle);
+                        node.position = Vector3Add(center, {offset.x, y, z});
+                    }
+                    rotated = true;
+                }
+                if (IsKeyPressed(KEY_PAGE_UP)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float x = offset.x * cos(rotationAngle) - offset.y * sin(rotationAngle);
+                        float y = offset.x * sin(rotationAngle) + offset.y * cos(rotationAngle);
+                        node.position = Vector3Add(center, {x, y, offset.z});
+                    }
+                    rotated = true;
+                }
+                if (IsKeyPressed(KEY_PAGE_DOWN)) {
+                    for (auto& node : modules[activeModule].nodes) {
+                        Vector3 offset = Vector3Subtract(node.position, center);
+                        float x = offset.x * cos(-rotationAngle) - offset.y * sin(-rotationAngle);
+                        float y = offset.x * sin(-rotationAngle) + offset.y * cos(-rotationAngle);
+                        node.position = Vector3Add(center, {x, y, offset.z});
+                    }
+                    rotated = true;
+                }
+            }
+            
             if (moved) {
                 for (auto& node : modules[activeModule].nodes) {
                     node.position = Vector3Add(node.position, movement);
                 }
                 modules[activeModule].center = Vector3Add(modules[activeModule].center, movement);
                 SaveState(undoHistory, modules, nextModuleId);
+            }
+            
+            if (rotated) {
+                SaveState(undoHistory, modules, nextModuleId);
+                printf("Rotated module %d by 15 degrees\n", activeModule);
             }
         }
 
@@ -971,16 +1195,47 @@ int main() {
             if (IsKeyPressed(KEY_DELETE)) {
                 bool changed = false;
                 
-                if (hoveredWall != -1 && hoveredModule != -1) {
+                if (currentMode == MODE_SELECT && !selectedNodes.empty()) {
+                    std::vector<std::pair<int, int>> nodesToDelete;
+                    for (const auto& sel : selectedNodes) {
+                        nodesToDelete.push_back({sel.moduleIdx, sel.nodeIdx});
+                    }
+                    
+                    std::sort(nodesToDelete.begin(), nodesToDelete.end(), 
+                        [](const std::pair<int,int>& a, const std::pair<int,int>& b) {
+                            if (a.first != b.first) return a.first > b.first;
+                            return a.second > b.second;
+                        });
+                    
+                    for (const auto& p : nodesToDelete) {
+                        DeleteNode(modules, p.first, p.second);
+                    }
+                    
+                    selectedNodes.clear();
+                    changed = true;
+                    printf("Deleted %zu selected nodes\n", nodesToDelete.size());
+                }
+                else if (currentMode == MODE_MOVE_MODULE && activeModule != -1 && modules.size() > 1) {
+                    for (auto& wall : modules[activeModule].walls) {
+                        if (wall.hasTexture) {
+                            UnloadTexture(wall.texture);
+                        }
+                    }
+                    modules.erase(modules.begin() + activeModule);
+                    activeModule = -1;
+                    changed = true;
+                    printf("Deleted active module\n");
+                }
+                else if (hoveredWall != -1 && hoveredModule != -1) {
                     if (modules[hoveredModule].walls[hoveredWall].hasTexture) {
                         UnloadTexture(modules[hoveredModule].walls[hoveredWall].texture);
                     }
                     modules[hoveredModule].walls.erase(modules[hoveredModule].walls.begin() + hoveredWall);
-                    hoveredWall = -1; 
+                    hoveredWall = -1;
                     changed = true;
                 } else if (hoveredNode != -1 && hoveredModule != -1) {
-                    DeleteNode(modules[hoveredModule], hoveredNode);
-                    hoveredNode = -1; 
+                    DeleteNode(modules, hoveredModule, hoveredNode);
+                    hoveredNode = -1;
                     changed = true;
                 } else if (hoveredModule != -1 && modules.size() > 1) {
                     for (auto& wall : modules[hoveredModule].walls) {
@@ -989,7 +1244,7 @@ int main() {
                         }
                     }
                     modules.erase(modules.begin() + hoveredModule);
-                    hoveredModule = -1; 
+                    hoveredModule = -1;
                     changed = true;
                 }
                 if (changed) SaveState(undoHistory, modules, nextModuleId);
@@ -1032,34 +1287,98 @@ int main() {
                         }
                         modules[hoveredModule].walls[hoveredWall].texture = tex;
                         modules[hoveredModule].walls[hoveredWall].hasTexture = true;
-                        printf("Created default blue texture for wall (place texture.png in directory)\n");
+                        printf("Created default blue texture for wall\n");
                     }
                 } else {
-                    printf("T key pressed but no wall hovered! Hover over a wall first.\n");
+                    printf("T key pressed but no wall hovered!\n");
                 }
             }
             
+            // MODE_SELECT
             if (currentMode == MODE_SELECT) {
-                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredNode != -1 && hoveredModule != -1) {
-                    if (selectedModule == -1) {
-                        selectedModule = hoveredModule;
-                    }
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    double currentTime = GetTime();
                     
-                    if (selectedModule == hoveredModule) {
-                        auto it = std::find(selectedNodes.begin(), selectedNodes.end(), hoveredNode);
-                        if (it != selectedNodes.end()) {
-                            selectedNodes.erase(it);
+                    if (hoveredNode != -1 && hoveredModule != -1) {
+                        if (hoveredNode == lastClickedNode && 
+                            hoveredModule == lastClickedModule && 
+                            (currentTime - lastClickTime) < doubleClickTime) {
+                            
+                            selectedNodes.clear();
+                            for (int i = 0; i < (int)modules[hoveredModule].nodes.size(); i++) {
+                                selectedNodes.push_back({hoveredModule, i});
+                            }
+                            printf("Double-click: Selected all %zu nodes in module %d\n", 
+                                   selectedNodes.size(), hoveredModule);
+                            
+                            lastClickedNode = -1;
+                            lastClickedModule = -1;
+                            lastClickTime = 0.0;
                         } else {
-                            selectedNodes.push_back(hoveredNode);
+                            NodeSelection sel = {hoveredModule, hoveredNode};
+                            auto it = std::find_if(selectedNodes.begin(), selectedNodes.end(),
+                                [&sel](const NodeSelection& s) {
+                                    return s.moduleIdx == sel.moduleIdx && s.nodeIdx == sel.nodeIdx;
+                                });
+                            
+                            if (it != selectedNodes.end()) {
+                                selectedNodes.erase(it);
+                            } else {
+                                selectedNodes.push_back(sel);
+                            }
+                            
+                            lastClickedNode = hoveredNode;
+                            lastClickedModule = hoveredModule;
+                            lastClickTime = currentTime;
                         }
+                    } else if (hoveredModule != -1 && hoveredNode == -1) {
+                        activeModule = hoveredModule;
+                    } else {
+                        isDragSelecting = true;
+                        dragSelectStart = GetMousePosition();
+                        dragSelectEnd = dragSelectStart;
                     }
                 }
                 
-                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredModule != -1 && hoveredNode == -1) {
-                    activeModule = hoveredModule;
+                if (isDragSelecting) {
+                    dragSelectEnd = GetMousePosition();
+                }
+                
+                if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && isDragSelecting) {
+                    isDragSelecting = false;
+                    
+                    float minX = fmin(dragSelectStart.x, dragSelectEnd.x);
+                    float maxX = fmax(dragSelectStart.x, dragSelectEnd.x);
+                    float minY = fmin(dragSelectStart.y, dragSelectEnd.y);
+                    float maxY = fmax(dragSelectStart.y, dragSelectEnd.y);
+                    
+                    for (size_t m = 0; m < modules.size(); m++) {
+                        for (size_t i = 0; i < modules[m].nodes.size(); i++) {
+                            Vector2 screenPos = GetWorldToScreen(modules[m].nodes[i].position, camera);
+                            
+                            if (screenPos.x >= minX && screenPos.x <= maxX &&
+                                screenPos.y >= minY && screenPos.y <= maxY) {
+                                
+                                NodeSelection sel = {(int)m, (int)i};
+                                auto it = std::find_if(selectedNodes.begin(), selectedNodes.end(),
+                                    [&sel](const NodeSelection& s) {
+                                        return s.moduleIdx == sel.moduleIdx && s.nodeIdx == sel.nodeIdx;
+                                    });
+                                
+                                if (it == selectedNodes.end()) {
+                                    selectedNodes.push_back(sel);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!selectedNodes.empty()) {
+                        printf("Drag selection: %zu nodes selected\n", selectedNodes.size());
+                    }
                 }
             }
             
+            // MODE_MOVE_VERTEX
             if (currentMode == MODE_MOVE_VERTEX) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredNode != -1 && hoveredModule != -1) {
                     isDragging = true;
@@ -1079,6 +1398,7 @@ int main() {
                 }
             }
             
+            // MODE_MOVE_MODULE
             if (currentMode == MODE_MOVE_MODULE) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredModule != -1) {
                     isDraggingModule = true;
@@ -1105,11 +1425,10 @@ int main() {
                 }
             }
             
+            // MODE_ADD_NODE
             if (currentMode == MODE_ADD_NODE) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     float moduleAssignmentDistance = 15.0f;
-                    int newNodeIndex = -1;
-                    int targetModule = -1;
                     
                     int closestModule = -1;
                     float closestDist = FLT_MAX;
@@ -1131,8 +1450,6 @@ int main() {
                         Node newNode;
                         newNode.position = previewNodePosition;
                         modules[hoveredModule].nodes.push_back(newNode);
-                        newNodeIndex = (int)modules[hoveredModule].nodes.size() - 1;
-                        targetModule = hoveredModule;
                         activeModule = hoveredModule;
                     } else {
                         GridModule newModule;
@@ -1142,42 +1459,281 @@ int main() {
                         newModule.center = previewNodePosition;
                         newModule.id = nextModuleId++;
                         modules.push_back(newModule);
-                        newNodeIndex = 0;
-                        targetModule = (int)modules.size() - 1;
-                        activeModule = targetModule;
+                        activeModule = (int)modules.size() - 1;
                     }
                     
                     SaveState(undoHistory, modules, nextModuleId);
                 }
             }
             
+            // MODE_CONNECT
             if (currentMode == MODE_CONNECT) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredNode != -1 && hoveredModule != -1) {
                     if (connectStartNode == -1) {
                         connectStartNode = hoveredNode;
                         connectStartModule = hoveredModule;
                     } else {
-                        if (connectStartModule == hoveredModule && 
-                            !(connectStartNode == hoveredNode && connectStartModule == hoveredModule)) {
+                        if (!(connectStartNode == hoveredNode && connectStartModule == hoveredModule)) {
                             Node& node1 = modules[connectStartModule].nodes[connectStartNode];
                             Node& node2 = modules[hoveredModule].nodes[hoveredNode];
                             
                             bool alreadyConnected = false;
-                            for (int conn : node1.connections) {
-                                if (conn == hoveredNode) {
-                                    alreadyConnected = true;
-                                    break;
+
+                            if (connectStartModule == hoveredModule) {
+                                for (int conn : node1.connections) {
+                                    if (conn == hoveredNode) {
+                                        alreadyConnected = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!alreadyConnected) {
+                                    node1.connections.push_back(hoveredNode);
+                                    node2.connections.push_back(connectStartNode);
+                                    SaveState(undoHistory, modules, nextModuleId);
+                                }
+                            } else {
+                                for (const auto& p : node1.crossModuleConnections) {
+                                    if (p.first == hoveredModule && p.second == hoveredNode) {
+                                        alreadyConnected = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!alreadyConnected) {
+                                    node1.crossModuleConnections.push_back({hoveredModule, hoveredNode});
+                                    node2.crossModuleConnections.push_back({connectStartModule, connectStartNode});
+                                    SaveState(undoHistory, modules, nextModuleId);
+                                }
+                            }
+                        }
+                        
+                        connectStartNode = -1;
+                        connectStartModule = -1;
+                    }
+                }
+            }
+            
+            // MODE_ROTATE_MODULE
+            if (currentMode == MODE_ROTATE_MODULE) {
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoveredModule != -1) {
+                    activeModule = hoveredModule;
+                    printf("Module %d selected for rotation. Use arrow keys or mouse drag to rotate.\n", activeModule);
+                }
+                
+                if (activeModule != -1 && activeModule < (int)modules.size()) {
+                    Vector3 center = modules[activeModule].center;
+                    bool rotated = false;
+                    float rotationAngle = 5.0f * DEG2RAD; // Smaller increments for smoother rotation
+                    
+                    // Keyboard rotation
+                    if (IsKeyPressed(KEY_LEFT)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float x = offset.x * cos(rotationAngle) - offset.z * sin(rotationAngle);
+                            float z = offset.x * sin(rotationAngle) + offset.z * cos(rotationAngle);
+                            node.position = Vector3Add(center, {x, offset.y, z});
+                        }
+                        rotated = true;
+                    }
+                    if (IsKeyPressed(KEY_RIGHT)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float x = offset.x * cos(-rotationAngle) - offset.z * sin(-rotationAngle);
+                            float z = offset.x * sin(-rotationAngle) + offset.z * cos(-rotationAngle);
+                            node.position = Vector3Add(center, {x, offset.y, z});
+                        }
+                        rotated = true;
+                    }
+                    if (IsKeyPressed(KEY_UP)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float y = offset.y * cos(rotationAngle) - offset.z * sin(rotationAngle);
+                            float z = offset.y * sin(rotationAngle) + offset.z * cos(rotationAngle);
+                            node.position = Vector3Add(center, {offset.x, y, z});
+                        }
+                        rotated = true;
+                    }
+                    if (IsKeyPressed(KEY_DOWN)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float y = offset.y * cos(-rotationAngle) - offset.z * sin(-rotationAngle);
+                            float z = offset.y * sin(-rotationAngle) + offset.z * cos(-rotationAngle);
+                            node.position = Vector3Add(center, {offset.x, y, z});
+                        }
+                        rotated = true;
+                    }
+                    if (IsKeyPressed(KEY_PAGE_UP)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float x = offset.x * cos(rotationAngle) - offset.y * sin(rotationAngle);
+                            float y = offset.x * sin(rotationAngle) + offset.y * cos(rotationAngle);
+                            node.position = Vector3Add(center, {x, y, offset.z});
+                        }
+                        rotated = true;
+                    }
+                    if (IsKeyPressed(KEY_PAGE_DOWN)) {
+                        for (auto& node : modules[activeModule].nodes) {
+                            Vector3 offset = Vector3Subtract(node.position, center);
+                            float x = offset.x * cos(-rotationAngle) - offset.y * sin(-rotationAngle);
+                            float y = offset.x * sin(-rotationAngle) + offset.y * cos(-rotationAngle);
+                            node.position = Vector3Add(center, {x, y, offset.z});
+                        }
+                        rotated = true;
+                    }
+                    
+                    // Mouse drag rotation
+                    static bool isRotatingWithMouse = false;
+                    static Vector2 lastRotateMousePos = {0, 0};
+                    
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        isRotatingWithMouse = true;
+                        lastRotateMousePos = GetMousePosition();
+                    }
+                    
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                        if (isRotatingWithMouse && rotated) {
+                            SaveState(undoHistory, modules, nextModuleId);
+                        }
+                        isRotatingWithMouse = false;
+                    }
+                    
+                    if (isRotatingWithMouse && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                        Vector2 currentMousePos = GetMousePosition();
+                        Vector2 delta = {currentMousePos.x - lastRotateMousePos.x, currentMousePos.y - lastRotateMousePos.y};
+                        
+                        if (fabs(delta.x) > 0.5f || fabs(delta.y) > 0.5f) {
+                            float mouseSensitivity = 0.003f;
+                            
+                            // Horizontal mouse movement rotates around Y axis
+                            if (fabs(delta.x) > 0.5f) {
+                                float angleY = -delta.x * mouseSensitivity;
+                                for (auto& node : modules[activeModule].nodes) {
+                                    Vector3 offset = Vector3Subtract(node.position, center);
+                                    float x = offset.x * cos(angleY) - offset.z * sin(angleY);
+                                    float z = offset.x * sin(angleY) + offset.z * cos(angleY);
+                                    node.position = Vector3Add(center, {x, offset.y, z});
                                 }
                             }
                             
-                            if (!alreadyConnected) {
-                                node1.connections.push_back(hoveredNode);
-                                node2.connections.push_back(connectStartNode);
-                                SaveState(undoHistory, modules, nextModuleId);
+                            // Vertical mouse movement rotates around X axis
+                            if (fabs(delta.y) > 0.5f) {
+                                float angleX = -delta.y * mouseSensitivity;
+                                for (auto& node : modules[activeModule].nodes) {
+                                    Vector3 offset = Vector3Subtract(node.position, center);
+                                    float y = offset.y * cos(angleX) - offset.z * sin(angleX);
+                                    float z = offset.y * sin(angleX) + offset.z * cos(angleX);
+                                    node.position = Vector3Add(center, {offset.x, y, z});
+                                }
                             }
+                            
+                            rotated = true;
+                            lastRotateMousePos = currentMousePos;
                         }
-                        connectStartNode = -1;
-                        connectStartModule = -1;
+                    }
+                    
+                    if (rotated && !isRotatingWithMouse) {
+                        SaveState(undoHistory, modules, nextModuleId);
+                    }
+                }
+            }
+            
+            // MODE_SCALE
+            if (currentMode == MODE_SCALE) {
+                if (!selectedNodes.empty()) {
+                    // Calculate center of selected nodes
+                    Vector3 selectionCenter = {0, 0, 0};
+                    for (const auto& sel : selectedNodes) {
+                        selectionCenter.x += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.x;
+                        selectionCenter.y += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.y;
+                        selectionCenter.z += modules[sel.moduleIdx].nodes[sel.nodeIdx].position.z;
+                    }
+                    selectionCenter.x /= selectedNodes.size();
+                    selectionCenter.y /= selectedNodes.size();
+                    selectionCenter.z /= selectedNodes.size();
+                    
+                    bool scaled = false;
+                    float scaleStep = 0.05f;
+                    
+                    // Keyboard scaling
+                    if (IsKeyPressed(KEY_EQUAL) || IsKeyPressed(KEY_KP_ADD)) {
+                        // Scale up
+                        for (const auto& sel : selectedNodes) {
+                            Vector3& pos = modules[sel.moduleIdx].nodes[sel.nodeIdx].position;
+                            Vector3 offset = Vector3Subtract(pos, selectionCenter);
+                            offset = Vector3Scale(offset, 1.0f + scaleStep);
+                            pos = Vector3Add(selectionCenter, offset);
+                        }
+                        scaled = true;
+                    }
+                    if (IsKeyPressed(KEY_MINUS) || IsKeyPressed(KEY_KP_SUBTRACT)) {
+                        // Scale down
+                        for (const auto& sel : selectedNodes) {
+                            Vector3& pos = modules[sel.moduleIdx].nodes[sel.nodeIdx].position;
+                            Vector3 offset = Vector3Subtract(pos, selectionCenter);
+                            offset = Vector3Scale(offset, 1.0f - scaleStep);
+                            pos = Vector3Add(selectionCenter, offset);
+                        }
+                        scaled = true;
+                    }
+                    
+                    // Mouse wheel scaling
+                    float wheel = GetMouseWheelMove();
+                    if (wheel != 0) {
+                        float scaleFactor = 1.0f + (wheel * scaleStep);
+                        for (const auto& sel : selectedNodes) {
+                            Vector3& pos = modules[sel.moduleIdx].nodes[sel.nodeIdx].position;
+                            Vector3 offset = Vector3Subtract(pos, selectionCenter);
+                            offset = Vector3Scale(offset, scaleFactor);
+                            pos = Vector3Add(selectionCenter, offset);
+                        }
+                        scaled = true;
+                    }
+                    
+                    // Mouse drag scaling
+                    static bool isScalingWithMouse = false;
+                    static Vector2 lastScaleMousePos = {0, 0};
+                    static float initialMouseY = 0;
+                    
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        isScalingWithMouse = true;
+                        lastScaleMousePos = GetMousePosition();
+                        initialMouseY = lastScaleMousePos.y;
+                    }
+                    
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                        if (isScalingWithMouse && scaled) {
+                            SaveState(undoHistory, modules, nextModuleId);
+                        }
+                        isScalingWithMouse = false;
+                    }
+                    
+                    if (isScalingWithMouse && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                        Vector2 currentMousePos = GetMousePosition();
+                        float deltaY = lastScaleMousePos.y - currentMousePos.y; // Inverted: up = scale up
+                        
+                        if (fabs(deltaY) > 0.5f) {
+                            float scaleFactor = 1.0f + (deltaY * 0.001f); // Mouse sensitivity
+                            for (const auto& sel : selectedNodes) {
+                                Vector3& pos = modules[sel.moduleIdx].nodes[sel.nodeIdx].position;
+                                Vector3 offset = Vector3Subtract(pos, selectionCenter);
+                                offset = Vector3Scale(offset, scaleFactor);
+                                pos = Vector3Add(selectionCenter, offset);
+                            }
+                            scaled = true;
+                            lastScaleMousePos = currentMousePos;
+                        }
+                    }
+                    
+                    if (scaled && !isScalingWithMouse) {
+                        SaveState(undoHistory, modules, nextModuleId);
+                    }
+                } else {
+                    // No nodes selected - show instructions
+                    static double lastMessageTime = 0;
+                    if (GetTime() - lastMessageTime > 3.0) {
+                        printf("Scale mode: Select nodes first (press 1 for Select mode)\n");
+                        lastMessageTime = GetTime();
                     }
                 }
             }
@@ -1201,7 +1757,24 @@ int main() {
                 for (size_t i = 0; i < modules[m].nodes.size(); i++) {
                     for (int conn : modules[m].nodes[i].connections) {
                         if ((int)i < conn) {
-                            DrawLine3D(modules[m].nodes[i].position, modules[m].nodes[conn].position, Color{32,32,32,255});
+                            DrawLine3D(modules[m].nodes[i].position, modules[m].nodes[conn].position, Color{80, 80, 80, 255});
+                        }
+                    }
+                }
+                
+                for (size_t i = 0; i < modules[m].nodes.size(); i++) {
+                    for (const auto& conn : modules[m].nodes[i].crossModuleConnections) {
+                        int targetModule = conn.first;
+                        int targetNode = conn.second;
+                        
+                        if (targetModule >= 0 && targetModule < (int)modules.size() &&
+                            targetNode >= 0 && targetNode < (int)modules[targetModule].nodes.size()) {
+                            
+                            if ((int)m < targetModule) {
+                                DrawLine3D(modules[m].nodes[i].position, 
+                                         modules[targetModule].nodes[targetNode].position, 
+                                         Color{0, 200, 255, 255});
+                            }
                         }
                     }
                 }
@@ -1211,8 +1784,15 @@ int main() {
                 Color nc = DARKPURPLE;
                 
                 if (cursorEnabled) {
-                    if (currentMode == MODE_SELECT && selectedModule == (int)m && 
-                        std::find(selectedNodes.begin(), selectedNodes.end(), (int)i) != selectedNodes.end()) {
+                    bool isSelected = false;
+                    for (const auto& sel : selectedNodes) {
+                        if (sel.moduleIdx == (int)m && sel.nodeIdx == (int)i) {
+                            isSelected = true;
+                            break;
+                        }
+                    }
+                    
+                    if (isSelected) {
                         nc = YELLOW;
                     } else if (currentMode == MODE_CONNECT && connectStartNode == (int)i && connectStartModule == (int)m) {
                         nc = LIME;
@@ -1236,10 +1816,11 @@ int main() {
         
         if (currentMode == MODE_CONNECT && connectStartNode != -1 && connectStartModule != -1) {
             Vector3 startPos = modules[connectStartModule].nodes[connectStartNode].position;
-            if (hoveredNode != -1 && hoveredModule != -1 && hoveredModule == connectStartModule) {
+            if (hoveredNode != -1 && hoveredModule != -1) {
                 Vector3 endPos = modules[hoveredModule].nodes[hoveredNode].position;
-                DrawLine3D(startPos, endPos, LIME);
-                DrawSphere(endPos, sphereRadius * 0.5f, LIME);
+                Color lineColor = (connectStartModule == hoveredModule) ? LIME : SKYBLUE;
+                DrawLine3D(startPos, endPos, lineColor);
+                DrawSphere(endPos, sphereRadius * 0.5f, lineColor);
             } else {
                 Vector3 mouseWorld = GetMouseWorldPosition(camera, Vector3Distance(camera.position, startPos));
                 DrawLine3D(startPos, mouseWorld, Color{0, 255, 0, 100});
@@ -1260,15 +1841,27 @@ int main() {
         
         EndMode3D();
 
-        int tw = 0; for (const auto& mod : modules) tw += mod.walls.size();
-        DrawText(TextFormat("Modules: %zu | Walls: %d | FPS: %d | Active: %d", modules.size(), tw, GetFPS(), activeModule), 10, 10, 18, YELLOW);
+        int tw = 0; 
+        int totalConnections = 0;
+        int crossModuleConnections = 0;
+        
+        for (const auto& mod : modules) {
+            tw += mod.walls.size();
+            for (const auto& node : mod.nodes) {
+                totalConnections += node.connections.size();
+                crossModuleConnections += node.crossModuleConnections.size();
+            }
+        }
+        
+        DrawText(TextFormat("Modules: %zu | Walls: %d | Connections: %d (%d cross) | FPS: %d", 
+                           modules.size(), tw, totalConnections/2, crossModuleConnections/2, GetFPS()), 10, 10, 18, YELLOW);
         
         const char* modeName = "";
         Color modeColor = WHITE;
         if (currentMode == MODE_SELECT) {
             modeName = "SELECT MODE";
             modeColor = GREEN;
-            DrawText(TextFormat("Selected: %zu nodes | SPACE: Fill (min 3) | CTRL+D/C: Clone active module", selectedNodes.size()), 10, 35, 16, modeColor);
+            DrawText(TextFormat("Selected: %zu nodes (cross-module) | SPACE: Wall | DEL: Delete", selectedNodes.size()), 10, 35, 16, modeColor);
         } else if (currentMode == MODE_MOVE_VERTEX) {
             modeName = "MOVE VERTEX MODE";
             modeColor = RED;
@@ -1276,28 +1869,53 @@ int main() {
         } else if (currentMode == MODE_MOVE_MODULE) {
             modeName = "MOVE MODULE MODE";
             modeColor = BLUE;
-            DrawText("LMB: Drag entire module", 10, 35, 16, modeColor);
+            DrawText("LMB: Drag entire module | DEL: Delete active module", 10, 35, 16, modeColor);
         } else if (currentMode == MODE_ADD_NODE) {
             modeName = "ADD NODE MODE";
             modeColor = YELLOW;
-            DrawText(TextFormat("LMB: Add node (no auto-connect) | Mouse Wheel: Distance (%.1f)", addNodeDistance), 10, 35, 16, modeColor);
+            DrawText(TextFormat("LMB: Add node | Mouse Wheel: Distance (%.1f)", addNodeDistance), 10, 35, 16, modeColor);
         } else if (currentMode == MODE_CONNECT) {
             modeName = "CONNECT MODE";
             modeColor = LIME;
             if (connectStartNode == -1) {
                 DrawText("Click first node to start connection", 10, 35, 16, modeColor);
             } else {
-                DrawText("Click second node (same module) to connect", 10, 35, 16, modeColor);
+                DrawText("Click second node (any module) to connect", 10, 35, 16, modeColor);
+            }
+        } else if (currentMode == MODE_ROTATE_MODULE) {
+            modeName = "ROTATE MODULE MODE";
+            modeColor = MAGENTA;
+            if (activeModule == -1) {
+                DrawText("Click on a module to select it for rotation", 10, 35, 16, modeColor);
+            } else {
+                DrawText(TextFormat("Rotating Module %d | ARROWS: Rotate | LMB+Drag: Free rotate", activeModule), 10, 35, 16, modeColor);
+            }
+        } else if (currentMode == MODE_SCALE) {
+            modeName = "SCALE MODE";
+            modeColor = ORANGE;
+            if (selectedNodes.empty()) {
+                DrawText("No nodes selected! Press 1 to select nodes first", 10, 35, 16, modeColor);
+            } else {
+                DrawText(TextFormat("Scaling %zu nodes | +/-: Scale | Mouse Wheel: Scale | LMB+Drag: Scale", selectedNodes.size()), 10, 35, 16, modeColor);
             }
         }
         
         DrawText(TextFormat("Mode: %s", modeName), 10, 60, 18, modeColor);
-        DrawText("1:Select | 2:Move Vertex | 3:Move Module | 4:Add Node | 5:Connect", 10, 85, 14, LIGHTGRAY);
-        DrawText("RMB: Rotate Camera | ARROWS: Move active | G: Grid | C: Connections", 10, 110, 14, LIGHTGRAY);
-        DrawText("TAB: FPS Camera | N: Add module | CTRL+Z: Undo | DEL: Delete | F11: Maximize", 10, 135, 14, DARKGRAY);
-        DrawText("CTRL+S/F5: Export OBJ | CTRL+O/F6: Import OBJ | CTRL+D/C: Clone module", 10, 160, 14, DARKGRAY);
-        DrawText("T: Load texture on hovered wall (needs texture.png in directory)", 10, 185, 14, DARKGRAY);
-        DrawText("ESC: Cancel operation (press twice within 2s to exit)", 10, 210, 14, DARKGRAY);
+        DrawText("1:Select | 2:Move Vertex | 3:Move Module | 4:Add | 5:Connect | 6:Rotate | 7:Scale", 10, 85, 14, LIGHTGRAY);
+        DrawText("RMB: Rotate Camera | ARROWS: Move/Rotate | +/-: Scale (mode 7)", 10, 110, 14, LIGHTGRAY);
+        DrawText("TAB: FPS Camera | N: Add module | CTRL+Z: Undo | DEL: Delete | F11: Max", 10, 135, 14, DARKGRAY);
+        DrawText("CTRL+S/F5: Export | CTRL+O/F6: Import | CTRL+D/C: Clone | T: Texture", 10, 160, 14, DARKGRAY);
+        DrawText("ESC: Cancel (press twice within 2s to exit)", 10, 185, 14, DARKGRAY);
+        
+        if (isDragSelecting) {
+            float minX = fmin(dragSelectStart.x, dragSelectEnd.x);
+            float maxX = fmax(dragSelectStart.x, dragSelectEnd.x);
+            float minY = fmin(dragSelectStart.y, dragSelectEnd.y);
+            float maxY = fmax(dragSelectStart.y, dragSelectEnd.y);
+            
+            DrawRectangleLines((int)minX, (int)minY, (int)(maxX - minX), (int)(maxY - minY), YELLOW);
+            DrawRectangle((int)minX, (int)minY, (int)(maxX - minX), (int)(maxY - minY), Color{255, 255, 0, 30});
+        }
         
         if (GetTime() - escMessageTime < 2.0) {
             int msgWidth = MeasureText(escMessage, 20);
