@@ -1,0 +1,7 @@
+[
+    {
+        "directory": "C:/Users/Kris/raylib_project",
+        "command": "g++ -IC:/Users/Kris/raylib_project/include -LC:/Users/Kris/raylib_project/lib -c test.cpp -o test.o -lraylib -lopengl32 -lgdi32 -lwinmm",
+        "file": "C:/Users/Kris/raylib_project/test.cpp"
+    }
+]

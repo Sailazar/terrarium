@@ -13,9 +13,9 @@
 
 struct Node {
     Vector3 position;
-    std::vector<int> connections; // Local connections within same module
-    std::vector<std::pair<int, int>> crossModuleConnections; // {moduleIndex, nodeIndex}
-    float scale; // Visual scale of the node sphere
+    std::vector<int> connections; 
+    std::vector<std::pair<int, int>> crossModuleConnections; 
+    float scale; 
 };
 
 struct Wall {
@@ -162,28 +162,6 @@ bool AreNodesCoplanar(const std::vector<Node>& nodes, const std::vector<int>& in
     }
     
     return true;
-}
-
-void CreateWallFromSelectedNodes(GridModule& module, const std::vector<int>& selected) {
-    if (selected.size() < 3) return;
-    if (!AreNodesCoplanar(module.nodes, selected)) return;
-    
-    for (const auto& wall : module.walls) {
-        std::vector<int> wallNodes = wall.nodeIndices;
-        std::sort(wallNodes.begin(), wallNodes.end());
-        std::vector<int> sortedSelected = selected;
-        std::sort(sortedSelected.begin(), sortedSelected.end());
-        
-        if (wallNodes == sortedSelected) {
-            return;
-        }
-    }
-    
-    Wall newWall;
-    newWall.nodeIndices = selected;
-    newWall.hasTexture = false;
-    newWall.texture = {};
-    module.walls.push_back(newWall);
 }
 
 void DeleteNode(std::vector<GridModule>& modules, int moduleIdx, int nodeIdx) {
@@ -495,7 +473,7 @@ bool ExportToOBJ(const std::vector<GridModule>& modules, const char* filename) {
     return true;
 }
 
-bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const char* filename) {
+bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const char* filename, Camera3D& camera) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         printf("Failed to open file: %s\n", filename);
@@ -592,23 +570,48 @@ bool ImportFromOBJ(std::vector<GridModule>& modules, int& nextModuleId, const ch
         }
     }
     
+    // Calculate Center and Bounding Box for Camera
     if (!newModule.nodes.empty()) {
+        Vector3 minV = {FLT_MAX, FLT_MAX, FLT_MAX};
+        Vector3 maxV = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
         Vector3 sum = {0, 0, 0};
+        
         for (const auto& node : newModule.nodes) {
             sum.x += node.position.x;
             sum.y += node.position.y;
             sum.z += node.position.z;
+            
+            if (node.position.x < minV.x) minV.x = node.position.x;
+            if (node.position.x > maxV.x) maxV.x = node.position.x;
+            if (node.position.y < minV.y) minV.y = node.position.y;
+            if (node.position.y > maxV.y) maxV.y = node.position.y;
+            if (node.position.z < minV.z) minV.z = node.position.z;
+            if (node.position.z > maxV.z) maxV.z = node.position.z;
         }
+        
         newModule.center.x = sum.x / newModule.nodes.size();
         newModule.center.y = sum.y / newModule.nodes.size();
         newModule.center.z = sum.z / newModule.nodes.size();
+        
+        camera.target = newModule.center;
+        
+        float dimX = maxV.x - minV.x;
+        float dimY = maxV.y - minV.y;
+        float dimZ = maxV.z - minV.z;
+        float maxDim = dimX;
+        if(dimY > maxDim) maxDim = dimY;
+        if(dimZ > maxDim) maxDim = dimZ;
+        
+        float dist = maxDim * 2.5f + 10.0f;
+        Vector3 offset = {dist, dist * 0.5f, dist};
+        camera.position = Vector3Add(newModule.center, offset);
     }
     
     modules.push_back(newModule);
     
     printf("Successfully imported OBJ: %zu vertices, %zu connections, %zu walls\n", 
            vertices.size(), lines.size(), faces.size());
-    
+           
     return true;
 }
 
@@ -725,6 +728,24 @@ int main() {
             }
         }
 
+        if (IsFileDropped()) {
+            FilePathList droppedFiles = LoadDroppedFiles();
+            if (droppedFiles.count > 0) {
+                if (ImportFromOBJ(modules, nextModuleId, droppedFiles.paths[0], camera)) {
+                    SaveState(undoHistory, modules, nextModuleId);
+                    hoveredNode = hoveredModule = hoveredWall = -1;
+                    isDragging = isDraggingModule = false;
+                    selectedNodes.clear();
+                    activeModule = -1;
+                    cursorEnabled = true;
+                    EnableCursor();
+                    escMessage = "Imported & Camera Focused";
+                    escMessageTime = GetTime();
+                }
+            }
+            UnloadDroppedFiles(droppedFiles);
+        }
+
         if (IsKeyPressed(KEY_TAB)) {
             cursorEnabled = !cursorEnabled;
             cursorEnabled ? EnableCursor() : DisableCursor();
@@ -790,81 +811,97 @@ int main() {
             connectStartNode = connectStartModule = -1;
         }
         
-        // SPACE key for wall creation with cross-module support
+        // --- FIXED SPACE KEY FOR WALL CREATION ---
         if (currentMode == MODE_SELECT && IsKeyPressed(KEY_SPACE) && selectedNodes.size() >= 3) {
             std::vector<Vector3> positions;
             for (const auto& sel : selectedNodes) {
                 positions.push_back(modules[sel.moduleIdx].nodes[sel.nodeIdx].position);
             }
             
-            Vector3 p1 = positions[0];
-            Vector3 p2 = positions[1];
-            Vector3 p3 = positions[2];
-            
-            Vector3 v1 = Vector3Subtract(p2, p1);
-            Vector3 v2 = Vector3Subtract(p3, p1);
-            Vector3 normal = Vector3Normalize(Vector3CrossProduct(v1, v2));
-            
-            bool coplanar = true;
-            for (size_t i = 3; i < positions.size(); i++) {
-                Vector3 v3 = Vector3Subtract(positions[i], p1);
-                float dot = fabs(Vector3DotProduct(normal, v3));
-                if (dot > 1.0f) {
-                    coplanar = false;
-                    break;
-                }
-            }
-            
-            if (coplanar) {
-                int targetModule = selectedNodes[0].moduleIdx;
+            if (positions.size() >= 3) {
+                Vector3 p1 = positions[0];
+                Vector3 p2 = positions[1];
+                Vector3 p3 = positions[2];
                 
-                bool allSameModule = true;
-                for (const auto& sel : selectedNodes) {
-                    if (sel.moduleIdx != targetModule) {
-                        allSameModule = false;
-                        break;
-                    }
-                }
+                Vector3 v1 = Vector3Subtract(p2, p1);
+                Vector3 v2 = Vector3Subtract(p3, p1);
                 
-                if (allSameModule) {
-                    Wall newWall;
-                    for (const auto& sel : selectedNodes) {
-                        newWall.nodeIndices.push_back(sel.nodeIdx);
-                    }
-                    newWall.hasTexture = false;
-                    newWall.texture = {};
-                    modules[targetModule].walls.push_back(newWall);
-                    SaveState(undoHistory, modules, nextModuleId);
-                    printf("Created wall with %zu nodes in module %d\n", newWall.nodeIndices.size(), targetModule);
+                // --- SAFETY FIX: Check for Collinear Points ---
+                // If points are in a straight line, cross product length is 0 -> CRASH
+                Vector3 cross = Vector3CrossProduct(v1, v2);
+                float crossLength = Vector3Length(cross);
+                
+                if (crossLength < 0.001f) {
+                    printf("Cannot create wall: Selected points are collinear (straight line).\n");
+                    escMessage = "Collinear! Move nodes to form a triangle.";
+                    escMessageTime = GetTime();
+                    // Do not proceed to Normalization (which would crash)
                 } else {
-                    std::vector<int> wallNodeIndices;
+                    // Safe to normalize
+                    Vector3 normal = Vector3Normalize(cross);
                     
-                    for (const auto& sel : selectedNodes) {
-                        if (sel.moduleIdx == targetModule) {
-                            wallNodeIndices.push_back(sel.nodeIdx);
-                        } else {
-                            Node newNode = modules[sel.moduleIdx].nodes[sel.nodeIdx];
-                            modules[targetModule].nodes.push_back(newNode);
-                            int newIdx = (int)modules[targetModule].nodes.size() - 1;
-                            wallNodeIndices.push_back(newIdx);
-                            
-                            modules[targetModule].nodes[newIdx].crossModuleConnections.push_back({sel.moduleIdx, sel.nodeIdx});
-                            modules[sel.moduleIdx].nodes[sel.nodeIdx].crossModuleConnections.push_back({targetModule, newIdx});
+                    bool coplanar = true;
+                    for (size_t i = 3; i < positions.size(); i++) {
+                        Vector3 v3 = Vector3Subtract(positions[i], p1);
+                        float dot = fabs(Vector3DotProduct(normal, v3));
+                        if (dot > 1.0f) {
+                            coplanar = false;
+                            break;
                         }
                     }
                     
-                    Wall newWall;
-                    newWall.nodeIndices = wallNodeIndices;
-                    newWall.hasTexture = false;
-                    newWall.texture = {};
-                    modules[targetModule].walls.push_back(newWall);
-                    SaveState(undoHistory, modules, nextModuleId);
-                    printf("Created cross-module wall with %zu nodes in module %d\n", wallNodeIndices.size(), targetModule);
+                    if (coplanar) {
+                        int targetModule = selectedNodes[0].moduleIdx;
+                        
+                        bool allSameModule = true;
+                        for (const auto& sel : selectedNodes) {
+                            if (sel.moduleIdx != targetModule) {
+                                allSameModule = false;
+                                break;
+                            }
+                        }
+                        
+                        if (allSameModule) {
+                            Wall newWall;
+                            for (const auto& sel : selectedNodes) {
+                                newWall.nodeIndices.push_back(sel.nodeIdx);
+                            }
+                            newWall.hasTexture = false;
+                            newWall.texture = {};
+                            modules[targetModule].walls.push_back(newWall);
+                            SaveState(undoHistory, modules, nextModuleId);
+                            printf("Created wall with %zu nodes in module %d\n", newWall.nodeIndices.size(), targetModule);
+                        } else {
+                            std::vector<int> wallNodeIndices;
+                            
+                            for (const auto& sel : selectedNodes) {
+                                if (sel.moduleIdx == targetModule) {
+                                    wallNodeIndices.push_back(sel.nodeIdx);
+                                } else {
+                                    Node newNode = modules[sel.moduleIdx].nodes[sel.nodeIdx];
+                                    modules[targetModule].nodes.push_back(newNode);
+                                    int newIdx = (int)modules[targetModule].nodes.size() - 1;
+                                    wallNodeIndices.push_back(newIdx);
+                                    
+                                    modules[targetModule].nodes[newIdx].crossModuleConnections.push_back({sel.moduleIdx, sel.nodeIdx});
+                                    modules[sel.moduleIdx].nodes[sel.nodeIdx].crossModuleConnections.push_back({targetModule, newIdx});
+                                }
+                            }
+                            
+                            Wall newWall;
+                            newWall.nodeIndices = wallNodeIndices;
+                            newWall.hasTexture = false;
+                            newWall.texture = {};
+                            modules[targetModule].walls.push_back(newWall);
+                            SaveState(undoHistory, modules, nextModuleId);
+                            printf("Created cross-module wall with %zu nodes in module %d\n", wallNodeIndices.size(), targetModule);
+                        }
+                        
+                        selectedNodes.clear();
+                    } else {
+                        printf("Selected nodes are not coplanar - cannot create wall\n");
+                    }
                 }
-                
-                selectedNodes.clear();
-            } else {
-                printf("Selected nodes are not coplanar - cannot create wall\n");
             }
         }
         
@@ -957,6 +994,8 @@ int main() {
             const char* filename = "model.obj";
             if (ExportToOBJ(modules, filename)) {
                 printf("Model exported to %s\n", filename);
+                escMessage = "Exported to model.obj";
+                escMessageTime = GetTime();
             } else {
                 printf("Failed to export model to %s\n", filename);
             }
@@ -973,7 +1012,7 @@ int main() {
         
         if ((IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) && IsKeyPressed(KEY_O)) {
             const char* filename = "model.obj";
-            if (ImportFromOBJ(modules, nextModuleId, filename)) {
+            if (ImportFromOBJ(modules, nextModuleId, filename, camera)) {
                 printf("Model imported from %s\n", filename);
                 SaveState(undoHistory, modules, nextModuleId);
                 hoveredNode = hoveredModule = hoveredWall = -1;
@@ -987,7 +1026,7 @@ int main() {
         
         if (IsKeyPressed(KEY_F6)) {
             const char* filename = "model.obj";
-            if (ImportFromOBJ(modules, nextModuleId, filename)) {
+            if (ImportFromOBJ(modules, nextModuleId, filename, camera)) {
                 printf("Model imported from %s\n", filename);
                 SaveState(undoHistory, modules, nextModuleId);
                 hoveredNode = hoveredModule = hoveredWall = -1;
@@ -1524,7 +1563,7 @@ int main() {
                 if (activeModule != -1 && activeModule < (int)modules.size()) {
                     Vector3 center = modules[activeModule].center;
                     bool rotated = false;
-                    float rotationAngle = 5.0f * DEG2RAD; // Smaller increments for smoother rotation
+                    float rotationAngle = 5.0f * DEG2RAD;
                     
                     // Keyboard rotation
                     if (IsKeyPressed(KEY_LEFT)) {
@@ -1905,7 +1944,8 @@ int main() {
         DrawText("RMB: Rotate Camera | ARROWS: Move/Rotate | +/-: Scale (mode 7)", 10, 110, 14, LIGHTGRAY);
         DrawText("TAB: FPS Camera | N: Add module | CTRL+Z: Undo | DEL: Delete | F11: Max", 10, 135, 14, DARKGRAY);
         DrawText("CTRL+S/F5: Export | CTRL+O/F6: Import | CTRL+D/C: Clone | T: Texture", 10, 160, 14, DARKGRAY);
-        DrawText("ESC: Cancel (press twice within 2s to exit)", 10, 185, 14, DARKGRAY);
+        DrawText("DRAG & DROP 'model.obj' to Import", 10, 185, 14, GREEN);
+        DrawText("ESC: Cancel (press twice within 2s to exit)", 10, 210, 14, DARKGRAY);
         
         if (isDragSelecting) {
             float minX = fmin(dragSelectStart.x, dragSelectEnd.x);
@@ -1917,7 +1957,7 @@ int main() {
             DrawRectangle((int)minX, (int)minY, (int)(maxX - minX), (int)(maxY - minY), Color{255, 255, 0, 30});
         }
         
-        if (GetTime() - escMessageTime < 2.0) {
+        if (GetTime() - escMessageTime < 3.0) {
             int msgWidth = MeasureText(escMessage, 20);
             DrawRectangle(GetScreenWidth()/2 - msgWidth/2 - 20, GetScreenHeight() - 80, msgWidth + 40, 50, Color{0, 0, 0, 200});
             DrawText(escMessage, GetScreenWidth()/2 - msgWidth/2, GetScreenHeight() - 65, 20, YELLOW);

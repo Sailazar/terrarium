@@ -1,0 +1,26 @@
+{
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/include",
+        "C:/Users/Kris/raylib_project/include"
+    ],
+    "C_Cpp.default.compilerPath": "C:/w64devkit/bin/g++.exe",
+    "C_Cpp.default.cStandard": "c17",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.intelliSenseMode": "windows-gcc-x64",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+    "files.associations": {
+        "raylib.h": "c",
+        "raymath.h": "c",
+        "*.cpp": "cpp",
+        "vector": "cpp",
+        "string": "cpp",
+        "iosfwd": "cpp",
+        "algorithm": "cpp",
+        "deque": "cpp",
+        "fstream": "cpp",
+        "sstream": "cpp"
+    }
+}
