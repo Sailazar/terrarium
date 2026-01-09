@@ -22,7 +22,7 @@ raylib_project/
 - Create and manipulate 3D nodes in a grid structure
 - Multiple modules support
 - Connect nodes within and across modules
-- Wall creation with texture support
+- **Wall creation with texture support**
 - OBJ file import/export
 - Multiple editing modes:
   - Select mode
@@ -32,6 +32,13 @@ raylib_project/
   - Connect nodes mode
   - Rotate module mode
   - Scale mode
+
+### Texture System
+- Apply custom textures to walls with a single keypress
+- Supports PNG, JPG, BMP, TGA, GIF, PSD formats
+- Automatic UV coordinate generation
+- Memory-managed texture loading/unloading
+- Default texture fallback if no file found
 
 ## Building the Project
 
@@ -62,7 +69,45 @@ Or double-click `test.exe` in File Explorer.
 
 ## Controls
 
-(Add your specific controls here based on the application)
+### Mode Switching
+- `1` - SELECT MODE (select nodes, create walls)
+- `2` - MOVE VERTEX MODE (move individual nodes)
+- `3` - MOVE MODULE MODE (move entire modules)
+- `4` - ADD NODE MODE (create new nodes)
+- `5` - CONNECT MODE (connect nodes)
+- `6` - ROTATE MODULE MODE (rotate modules)
+- `7` - SCALE MODE (scale node positions/geometry)
+- `8` - SCALE SPHERE MODE (scale visual sphere size only)
+
+### Actions
+- `SPACE` - Create wall from selected nodes (SELECT mode)
+- `T` - Apply texture to hovered wall
+- `N` - Add new module
+- `DEL` - Delete selected nodes/walls/modules
+- `TAB` - Toggle cursor/FPS camera
+- `G` - Toggle grid display
+- `C` - Toggle connection lines
+- `ESC` - Cancel operation (press twice to exit)
+
+### Camera
+- `RMB` - Rotate camera
+- `Arrow Keys` - Move/rotate (mode-dependent)
+- Mouse Wheel - Zoom/adjust distance
+
+### File Operations
+- `CTRL+S` or `F5` - Export to OBJ
+- `CTRL+O` or `F6` - Import from OBJ
+- `CTRL+D` or `CTRL+C` - Clone selected
+- `CTRL+Z` - Undo
+- Drag & Drop - Import model.obj file
+
+### Textures
+1. Create a wall (Select 3+ nodes, press SPACE)
+2. Place texture file in project root (texture.png, wall.png, etc.)
+3. Hover over wall with mouse
+4. Press `T` to apply texture
+
+See `TEXTURE_GUIDE.md` for detailed texture instructions.
 
 ## Troubleshooting
 
@@ -132,6 +177,26 @@ The application supports OBJ file format:
 - Built and tested on Windows with w64devkit
 - Raylib version included in the `lib/` directory
 - The executable (`test.exe`) and object files (`.obj`) are already compiled
+
+## Documentation Files
+
+- **README.md** - This file (project overview)
+- **TEXTURE_GUIDE.md** - Comprehensive texture import guide
+- **TEXTURE_QUICK_REF.txt** - Quick reference for texture system
+- **COLOR_SCHEME.md** - UI color palette documentation
+- **QUICK_START.md** - Fast-start guide
+- **FIXES_APPLIED.md** - Technical configuration details
+- **fix_intellisense.bat** - Automated IntelliSense fix script
+
+## Color Scheme
+
+The UI uses a tactical surveillance-inspired color palette:
+- **CYBER_CYAN** (#00B4D8) - Primary selections and operations
+- **TACTICAL_ORANGE** (#FF9500) - Action modes and modifications
+- **AMBER_ALERT** (#FFBF00) - Stats, alerts, and important info
+- Dark cyan variations for text hierarchy
+
+See `COLOR_SCHEME.md` for complete palette details.
 
 ## License
 

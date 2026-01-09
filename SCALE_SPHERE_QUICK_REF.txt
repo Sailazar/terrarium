@@ -1,0 +1,205 @@
+╔════════════════════════════════════════════════════════════════╗
+║              SCALE SPHERE MODE - QUICK REFERENCE               ║
+╚════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────┐
+│ WHAT IS SCALE SPHERE MODE?                                     │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Changes the VISUAL SIZE of node spheres                      │
+│  WITHOUT moving their positions!                              │
+│                                                                │
+│  Perfect for:                                                 │
+│  • Creating visual hierarchy                                   │
+│  • Emphasizing important nodes                                 │
+│  • Reducing clutter in dense areas                            │
+│  • Visual design and aesthetics                               │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ HOW TO USE (3 STEPS)                                           │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  STEP 1: Select Nodes                                         │
+│  └─ Press [1] → Click nodes to select (yellow)                │
+│                                                                │
+│  STEP 2: Enter Scale Sphere Mode                              │
+│  └─ Press [8] → Mode indicator shows "SCALE SPHERE MODE"      │
+│                                                                │
+│  STEP 3: Scale the Spheres                                    │
+│  └─ [+] or [-] → Increase/decrease size                       │
+│  └─ Mouse Wheel → Scroll to scale                             │
+│  └─ LMB + Drag → Drag up/down to scale                        │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ KEYBOARD CONTROLS                                              │
+├────────────────────────────────────────────────────────────────┤
+│  [8]              Enter SCALE SPHERE MODE                      │
+│  [+] or [=]       Increase sphere size (+0.1)                  │
+│  [-] or [_]       Decrease sphere size (-0.1)                  │
+│  [1]              Return to SELECT mode                        │
+│  [CTRL+Z]         Undo last scale change                       │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ MOUSE CONTROLS                                                 │
+├────────────────────────────────────────────────────────────────┤
+│  Mouse Wheel UP      Increase sphere size                      │
+│  Mouse Wheel DOWN    Decrease sphere size                      │
+│  LMB + Drag UP       Increase sphere size (smooth)             │
+│  LMB + Drag DOWN     Decrease sphere size (smooth)             │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ SCALE RANGE                                                    │
+├────────────────────────────────────────────────────────────────┤
+│  Minimum:    0.1  (10% - nearly invisible)                     │
+│  Default:    1.0  (100% - normal size)                         │
+│  Maximum:    5.0  (500% - very large)                          │
+│                                                                │
+│  Recommended ranges:                                           │
+│  • Subtle variation:  0.8 - 1.2                               │
+│  • Emphasis:          1.5 - 2.5                               │
+│  • De-emphasis:       0.3 - 0.6                               │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ MODE 7 vs MODE 8                                               │
+├──────────────────────┬─────────────────────────────────────────┤
+│ MODE 7 (SCALE)       │ MODE 8 (SCALE SPHERE)                  │
+├──────────────────────┼─────────────────────────────────────────┤
+│ Scales POSITIONS     │ Scales VISUAL SIZE only                │
+│ Changes geometry     │ Positions stay fixed                   │
+│ Affects structure    │ Pure visual effect                     │
+│ Nodes move apart     │ Nodes stay in place                    │
+│ Use: Resize models   │ Use: Visual hierarchy                  │
+│ Key: [7]             │ Key: [8]                               │
+└──────────────────────┴─────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ COMMON USE CASES                                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  VISUAL HIERARCHY                                              │
+│  ├─ Important nodes:    scale = 2.0 (large)                   │
+│  ├─ Normal nodes:       scale = 1.0 (default)                 │
+│  └─ Background nodes:   scale = 0.5 (small)                   │
+│                                                                │
+│  REDUCE CLUTTER                                                │
+│  └─ Dense areas: Scale down to 0.3-0.5                        │
+│                                                                │
+│  EMPHASIS                                                      │
+│  └─ Selected work area: Scale up to 1.5-2.0                   │
+│                                                                │
+│  NODE TYPES                                                    │
+│  ├─ Type A (structural):  scale = 1.5                         │
+│  ├─ Type B (decorative):  scale = 0.8                         │
+│  └─ Type C (temporary):   scale = 0.4                         │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ EXAMPLE WORKFLOW                                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Creating a 3-tier hierarchy:                                 │
+│                                                                │
+│  1. [1] → Select main structural nodes                        │
+│  2. [8] → Enter Scale Sphere mode                             │
+│  3. [+][+][+] → Scale to ~1.3                                 │
+│                                                                │
+│  4. [1] → Select secondary nodes                              │
+│  5. [8] → Enter Scale Sphere mode                             │
+│  6. (Leave at 1.0 - default)                                  │
+│                                                                │
+│  7. [1] → Select detail nodes                                 │
+│  8. [8] → Enter Scale Sphere mode                             │
+│  9. [-][-][-][-][-] → Scale to ~0.5                           │
+│                                                                │
+│  Result: Clear visual hierarchy!                              │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ TIPS & BEST PRACTICES                                          │
+├────────────────────────────────────────────────────────────────┤
+│  ✓ Use consistent scales for node groups                      │
+│  ✓ Scale in multiples of 0.5 for clarity (0.5, 1.0, 1.5...)  │
+│  ✓ Make important nodes 1.5-2.0x larger                       │
+│  ✓ Use subtle scaling (0.8-1.2) for minor variations          │
+│  ✓ Test visibility before scaling too small                   │
+│                                                                │
+│  ✗ Avoid random scales without purpose                        │
+│  ✗ Don't scale below 0.2 (hard to select)                     │
+│  ✗ Don't scale above 3.0 (may obscure view)                   │
+│  ✗ Don't use for geometry changes (use Mode 7)                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  PROBLEM: "No spheres selected"                               │
+│  └─ Press [1] and click nodes first                           │
+│                                                                │
+│  PROBLEM: Spheres too small to see                            │
+│  └─ Drag-select all, press [8], then [+][+][+]               │
+│                                                                │
+│  PROBLEM: Can't select tiny spheres                           │
+│  └─ Use drag-select rectangle (LMB drag in SELECT mode)       │
+│                                                                │
+│  PROBLEM: Spheres too large, blocking view                    │
+│  └─ Select them, press [8], then [-][-][-]                   │
+│                                                                │
+│  PROBLEM: Changes not happening                               │
+│  └─ Ensure you pressed [8] to enter Scale Sphere mode         │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ IMPORTANT NOTES                                                │
+├────────────────────────────────────────────────────────────────┤
+│  • Sphere size is VISUAL ONLY                                 │
+│  • Node positions NEVER change in this mode                   │
+│  • Connections are NOT affected                               │
+│  • Walls are NOT affected                                     │
+│  • Changes are saved to undo history                          │
+│  • Scale is stored per-node                                   │
+│  • Export to OBJ uses positions only (not scale)              │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ QUICK COMPARISON                                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Want to RESIZE your model?                                   │
+│  → Use MODE 7 (Scale) - Press [7]                             │
+│                                                                │
+│  Want to change APPEARANCE only?                              │
+│  → Use MODE 8 (Scale Sphere) - Press [8]                      │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════╗
+║  For detailed documentation, see: SCALE_SPHERE_MODE.md        ║
+╚════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────┐
+│ TL;DR - THE ESSENTIALS                                         │
+├────────────────────────────────────────────────────────────────┤
+│  1. Press [1] → Select nodes                                  │
+│  2. Press [8] → Enter Scale Sphere mode                       │
+│  3. [+] to grow, [-] to shrink                                │
+│  4. Range: 0.1 to 5.0 (default 1.0)                           │
+│  5. Positions DON'T move, only visual size changes!           │
+└────────────────────────────────────────────────────────────────┘
+
+Last Updated: January 7, 2025
+Version: 1.0
+Mode Number: 8
+Shortcut: [8]
+
+═══════════════════════════════════════════════════════════════════

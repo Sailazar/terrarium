@@ -1,0 +1,162 @@
+╔════════════════════════════════════════════════════════════════╗
+║           TEXTURE IMPORT - QUICK REFERENCE CARD                ║
+╚════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────┐
+│ HOW TO ADD TEXTURES (4 SIMPLE STEPS)                          │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  STEP 1: CREATE A WALL                                        │
+│  ├─ Press [1] for SELECT MODE                                 │
+│  ├─ Click 3+ nodes (must be coplanar)                         │
+│  └─ Press [SPACE] to create wall                              │
+│                                                                │
+│  STEP 2: PREPARE TEXTURE FILE                                 │
+│  ├─ Get a PNG or JPG image                                    │
+│  ├─ Rename to: texture.png (or wall.png, tex.png)            │
+│  └─ Place in: C:\Users\Kris\raylib_project\                  │
+│                                                                │
+│  STEP 3: APPLY TEXTURE                                        │
+│  ├─ Hover mouse over the wall                                 │
+│  └─ Press [T] key                                             │
+│                                                                │
+│  STEP 4: DONE!                                                │
+│  └─ Texture is now applied to the wall                        │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ SUPPORTED TEXTURE FILES (Auto-detected in order)              │
+├────────────────────────────────────────────────────────────────┤
+│  1. texture.png    ← RECOMMENDED                              │
+│  2. texture.jpg                                               │
+│  3. wall.png                                                  │
+│  4. wall.jpg                                                  │
+│  5. tex.png                                                   │
+│  6. tex.jpg                                                   │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ SUPPORTED IMAGE FORMATS                                        │
+├────────────────────────────────────────────────────────────────┤
+│  ✓ PNG  - Best for transparency & quality                     │
+│  ✓ JPG  - Best for photos (smaller file size)                │
+│  ✓ BMP  - Basic bitmap                                        │
+│  ✓ TGA  - Targa format                                        │
+│  ✓ GIF  - First frame only                                    │
+│  ✓ PSD  - Photoshop (flattened)                              │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ RECOMMENDED TEXTURE SIZES                                      │
+├────────────────────────────────────────────────────────────────┤
+│  Small walls:    512x512 pixels                               │
+│  Medium walls:   1024x1024 pixels  ← RECOMMENDED              │
+│  Large walls:    2048x2048 pixels                             │
+│  Maximum:        4096x4096 pixels (GPU dependent)             │
+│                                                                │
+│  TIP: Use power-of-2 dimensions for best performance!         │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ KEYBOARD CONTROLS                                              │
+├────────────────────────────────────────────────────────────────┤
+│  [T]         Load/apply texture to hovered wall               │
+│  [1]         SELECT MODE (to create walls)                    │
+│  [SPACE]     Create wall from selected nodes                  │
+│  [DEL]       Delete selected nodes/walls                      │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ CONSOLE MESSAGES                                               │
+├────────────────────────────────────────────────────────────────┤
+│  ✓ SUCCESS:                                                   │
+│    "Successfully loaded texture: texture.png"                 │
+│                                                                │
+│  ⚠ NO FILE FOUND:                                             │
+│    "No texture file found, creating default blue texture"     │
+│                                                                │
+│  ✗ ERROR:                                                     │
+│    "Failed to load texture from file: texture.png"            │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  PROBLEM: "No texture file found"                             │
+│  ├─ Check file is in project root folder                      │
+│  ├─ Verify filename matches (texture.png, wall.png, etc.)    │
+│  └─ Check file extension is correct                           │
+│                                                                │
+│  PROBLEM: Texture appears stretched                           │
+│  ├─ Use rectangular walls for best results                    │
+│  ├─ Keep all wall nodes coplanar                              │
+│  └─ Use simpler wall shapes (3-4 nodes)                       │
+│                                                                │
+│  PROBLEM: Texture is blurry                                   │
+│  ├─ Use higher resolution texture                             │
+│  └─ Recommended: 1024x1024 or 2048x2048 pixels               │
+│                                                                │
+│  PROBLEM: "T key pressed but no wall hovered"                │
+│  ├─ Make sure mouse is over a wall                            │
+│  ├─ Wall should highlight when hovered                        │
+│  └─ Try moving mouse slightly                                 │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ EXAMPLE WORKFLOW                                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Creating a textured floor:                                   │
+│                                                                │
+│  1. [1] → SELECT MODE                                         │
+│  2. Click 4 corner nodes of floor                             │
+│  3. [SPACE] → Create wall                                     │
+│  4. Copy "floor.png" to project folder                        │
+│  5. Rename to "texture.png"                                   │
+│  6. Hover mouse over floor                                    │
+│  7. [T] → Apply texture                                       │
+│  8. Done! Floor is now textured                               │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ TIPS & BEST PRACTICES                                          │
+├────────────────────────────────────────────────────────────────┤
+│  ✓ Use seamless/tileable textures for best results            │
+│  ✓ PNG format for quality, JPG for smaller file size          │
+│  ✓ Keep textures under 2048x2048 for good performance         │
+│  ✓ Reuse textures - apply same texture to multiple walls      │
+│  ✓ Test texture on small wall first                           │
+│                                                                │
+│  ✗ Avoid mixing different texture styles                      │
+│  ✗ Don't use huge 4K textures unless necessary                │
+│  ✗ Avoid complex wall shapes (5+ nodes)                       │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ FREE TEXTURE RESOURCES                                         │
+├────────────────────────────────────────────────────────────────┤
+│  • Poly Haven (polyhaven.com) - CC0 free textures             │
+│  • Textures.com - Free + premium textures                     │
+│  • OpenGameArt.org - Free game assets                         │
+│  • CC0 Textures (cc0textures.com) - Public domain             │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ DEFAULT BEHAVIOR                                               │
+├────────────────────────────────────────────────────────────────┤
+│  If no texture file is found when you press [T]:              │
+│  → A default BLUE texture is automatically created             │
+│  → You can replace it later by adding a texture file           │
+│  → Just press [T] again after placing the file                │
+└────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════╗
+║  For detailed guide, see: TEXTURE_GUIDE.md                    ║
+╚════════════════════════════════════════════════════════════════╝
+
+Last Updated: January 7, 2025
+Version: 1.0
