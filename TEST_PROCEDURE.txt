@@ -1,0 +1,296 @@
+================================================================================
+                   TEXTURE SAVE/LOAD TEST PROCEDURE
+================================================================================
+
+PURPOSE
+-------
+Verify that walls and animated planes with textures are properly saved and
+restored when using CTRL+S and CTRL+L.
+
+
+PREREQUISITES
+-------------
+- Application compiled and running
+- At least one texture file available (PNG recommended)
+- Working keyboard and mouse
+
+
+TEST 1: WALL TEXTURE SAVE/LOAD
+-------------------------------
+
+Step 1: Create Geometry
+  □ Launch application
+  □ Create a simple cube or rectangle using nodes
+  □ Connect nodes to form a closed shape
+  □ Verify connections appear as lines
+
+Step 2: Apply Texture
+  □ Press 'T' to open Texture Library
+  □ Drag and drop a PNG/JPG texture onto the window
+  □ Texture should appear in library
+  □ Click a wall (face) in the 3D view
+  □ Click the texture in the library
+  □ Wall should now display the texture
+
+Step 3: Save Project
+  □ Press CTRL+S
+  □ Save dialog appears
+  □ Enter filename: "test_walls"
+  □ Click SAVE or press ENTER
+  □ Check console for:
+      "=== Saving Project: test_walls.dat ==="
+      "Saving X animated planes..."
+      "Saved Y wall texture mappings"
+      "Project saved to test_walls.dat"
+  □ Check files created:
+      test_walls.obj
+      test_walls.mtl
+      test_walls.dat
+
+Step 4: Clear Scene
+  □ Press CTRL+N (or restart application)
+  □ Verify scene is empty
+
+Step 5: Load Project
+  □ Press CTRL+L
+  □ Load dialog appears
+  □ Enter filename: "test_walls"
+  □ Click LOAD or press ENTER
+  □ Check console for:
+      "=== Loading Project: test_walls.dat ==="
+      "Successfully imported OBJ: X vertices, Y connections, Z walls"
+      "Auto-detected W walls from node connections" (if needed)
+      "Applied textures to W walls"
+      "Project loaded from test_walls.dat"
+
+Step 6: Verify Result
+  □ Geometry appears in 3D view
+  □ Wall shows texture correctly
+  □ Texture is same as before save
+  □ Colors and orientation match original
+
+RESULT: [ ] PASS  [ ] FAIL
+
+
+TEST 2: ANIMATED PLANE SAVE/LOAD
+---------------------------------
+
+Step 1: Create Animated Plane
+  □ Press 'A' to open Animation UI
+  □ Click "New Plane" button
+  □ Drag and drop 1-3 PNG files onto window
+  □ Plane should appear in 3D view with texture
+
+Step 2: Position Plane
+  □ Click and drag plane to desired position
+  □ Verify plane moves with mouse
+  □ Adjust size in Animation UI if desired
+
+Step 3: Save Project
+  □ Press CTRL+S
+  □ Enter filename: "test_plane"
+  □ Click SAVE
+  □ Check console for:
+      "Saving 1 animated planes..."
+      "Plane 0: Position(x, y, z), N frames"
+      "Frame 0: [texture path]"
+
+Step 4: Restart Application
+  □ Close and reopen application
+  □ Scene should be empty
+
+Step 5: Load Project
+  □ Press CTRL+L
+  □ Enter filename: "test_plane"
+  □ Click LOAD
+  □ Check console for:
+      "Loaded animated plane 0 with N frames"
+      "Total animated planes loaded: 1"
+
+Step 6: Verify Result
+  □ Press 'A' to see Animation UI
+  □ Plane appears at saved position
+  □ Plane shows correct texture
+  □ Plane list shows "Plane 0 (N frames)"
+  □ Animation plays if multiple frames
+
+RESULT: [ ] PASS  [ ] FAIL
+
+
+TEST 3: COMBINED SAVE/LOAD
+---------------------------
+
+Step 1: Create Complex Scene
+  □ Create geometry with multiple walls
+  □ Apply different textures to different walls
+  □ Create 2-3 animated planes with different positions
+  □ Add some with single frames, some with multiple
+
+Step 2: Save
+  □ Press CTRL+S
+  □ Enter filename: "test_combined"
+  □ Verify console shows all elements being saved
+
+Step 3: Load
+  □ Restart application
+  □ Press CTRL+L
+  □ Load "test_combined"
+  □ Verify console shows:
+      - Wall detection if needed
+      - Textures applied to walls
+      - All planes loaded
+
+Step 4: Verify Everything
+  □ All walls have correct textures
+  □ All planes appear at correct positions
+  □ All planes have correct textures
+  □ Animations play correctly
+  □ No missing texture errors in console
+
+RESULT: [ ] PASS  [ ] FAIL
+
+
+TROUBLESHOOTING
+---------------
+
+Issue: "Applied textures to 0 walls"
+  → Check: Console shows "Auto-detected X walls"
+  → If X = 0, geometry may not have closed cycles
+  → Solution: Manually ensure nodes form closed polygons
+
+Issue: "Texture not found"
+  → Texture file was moved or deleted
+  → Solution: Keep texture files in project folder
+  → Check: Texture paths in .dat file are valid
+
+Issue: "Auto-detected 0 walls"
+  → Geometry has no closed polygon cycles
+  → Solution: Verify nodes are connected in closed loops
+  → Check: At least 3 nodes connected in a cycle
+
+Issue: Plane appears but no texture
+  → Texture file missing from original path
+  → Check console for "Animation frame not found"
+  → Solution: Restore texture file to original location
+
+Issue: Texture appears black/white
+  → Texture may have loaded but with errors
+  → Check texture file is valid PNG/JPG
+  → Try reloading texture manually
+
+
+CONSOLE MESSAGES GUIDE
+-----------------------
+
+SUCCESS INDICATORS:
+  ✓ "Loaded successfully (ID: X)"
+  ✓ "Auto-detected X walls from node connections"
+  ✓ "Applied texture to wall (Texture ID: X)"
+  ✓ "Applied textures to X walls"
+  ✓ "Loaded animated plane X with Y frames"
+  ✓ "Project saved to [filename]"
+  ✓ "Project loaded from [filename]"
+
+WARNING INDICATORS:
+  ⚠ "Animation frame not found: [path]"
+  ⚠ "File not found"
+  ⚠ "Failed to load texture"
+
+ERROR INDICATORS:
+  ✗ "Module/Wall index out of range"
+  ✗ "TexID out of range"
+  ✗ "Failed to parse line"
+  ✗ "Failed to open file"
+
+
+VERIFICATION CHECKLIST
+----------------------
+After loading a saved project, all should be true:
+
+Walls:
+  □ Console shows walls were detected/imported
+  □ Console shows textures were applied
+  □ Walls visible in 3D viewport
+  □ Textures display correctly on walls
+  □ No black/missing textures
+
+Animated Planes:
+  □ Console shows planes loaded
+  □ Planes visible in Animation UI (press A)
+  □ Planes appear in 3D viewport
+  □ Textures display on planes
+  □ Correct number of frames loaded
+  □ Animation plays if multiple frames
+
+Files:
+  □ .obj file exists
+  □ .mtl file exists
+  □ .dat file exists
+  □ Texture files still at original paths
+
+
+EXPECTED FILE STRUCTURE
+------------------------
+After saving "myproject":
+
+myproject.obj - Contains:
+  # OBJ file exported from GreyScaleCube
+  mtllib myproject.mtl
+  v [vertices...]
+  l [lines...]
+  f [faces...] (if walls exist)
+
+myproject.mtl - Contains:
+  # MTL file exported from GreyScaleCube
+  newmtl material_[texture_name]
+  map_Kd [texture_path]
+
+myproject.dat - Contains:
+  # Project Save File
+  TEXTURE_LIBRARY_START
+  [textures...]
+  TEXTURE_LIBRARY_END
+  WALL_TEXTURES_START
+  [wall mappings...]
+  WALL_TEXTURES_END
+  ANIMATED_PLANES_START
+  [plane data...]
+  ANIMATED_PLANES_END
+
+
+PERFORMANCE NOTES
+-----------------
+- Small models (< 100 nodes): Instant
+- Medium models (100-500 nodes): < 1 second
+- Large models (500+ nodes): 1-5 seconds
+- Very large models (1000+ nodes): May take longer
+
+Wall detection time depends on:
+  - Number of nodes
+  - Number of connections per node
+  - Complexity of cycles in connection graph
+
+
+SUCCESS CRITERIA
+----------------
+All tests pass if:
+  ✓ Walls with textures save and restore correctly
+  ✓ Animated planes with textures save and restore correctly
+  ✓ No error messages in console
+  ✓ All textures visible and correct
+  ✓ Positions and sizes preserved
+  ✓ Frame timing and billboard mode preserved
+
+
+REPORT ISSUES
+-------------
+If any test fails, note:
+  - Which test failed
+  - Console error messages
+  - Expected vs actual result
+  - Steps to reproduce
+
+
+================================================================================
+                              END OF TEST PROCEDURE
+================================================================================

@@ -1,0 +1,218 @@
+================================================================================
+                  TRANSPARENT PNG - QUICK REFERENCE
+================================================================================
+
+TRANSPARENCY SUPPORT
+--------------------
+✓ Full alpha channel support (0-255 transparency)
+✓ Double-sided rendering (visible from both sides)
+✓ Proper alpha blending (smooth edges)
+✓ Works in billboard mode
+✓ Saves and loads correctly
+
+
+HOW TO USE
+----------
+1. Create or obtain PNG file with transparent background
+2. Press 'A' to open Animation UI
+3. Drag and drop PNG file(s) onto window
+4. Plane created automatically with transparency
+5. Done! Transparent areas will be see-through
+
+
+CREATING TRANSPARENT PNGS
+--------------------------
+Software Options:
+  - Photoshop: Save as PNG-24 or PNG-32
+  - GIMP: Export as PNG with alpha channel
+  - Paint.NET: Save as PNG (auto includes alpha)
+  - Online: Use remove.bg to remove backgrounds
+
+Requirements:
+  - Must be PNG format (not JPG!)
+  - Must have alpha channel
+  - RGB or RGBA color mode
+
+
+QUICK EXAMPLES
+--------------
+
+Character Sprite:
+  1. Drag character_01.png, character_02.png
+  2. Check "Billboard" in Animation UI
+  3. Adjust frame time for animation
+  4. Position in scene
+
+Floating Icon:
+  1. Drag icon.png (with transparency)
+  2. Check "Billboard"
+  3. Set size to 2x2 for smaller icon
+  4. Position above object
+
+Transparent Overlay:
+  1. Create semi-transparent PNG in editor
+  2. Drag into application
+  3. Uncheck "Billboard" for fixed orientation
+  4. Resize and position
+
+
+TECHNICAL DETAILS
+-----------------
+Blend Mode: BLEND_ALPHA (automatic)
+Backface Culling: Disabled (see both sides)
+Depth Testing: Enabled (proper Z-order)
+Color Multiplier: White (preserves original colors)
+
+
+KEYBOARD SHORTCUTS
+------------------
+A       : Toggle Animation UI
+CTRL+S  : Save (preserves transparency)
+CTRL+L  : Load (restores transparency)
+ESC     : Deselect plane
+
+
+TROUBLESHOOTING
+---------------
+
+PNG Not Transparent?
+  → Check PNG has alpha channel in image editor
+  → Re-export with transparency enabled
+  → Use PNG-24 or PNG-32 format
+
+Black Halo Around Edges?
+  → PNG has black background under alpha
+  → Re-export with transparent/white background
+  → Use "defringe" tool in image editor
+
+Jagged Edges?
+  → Use higher resolution PNG (2x or 4x size)
+  → Enable anti-aliasing when creating PNG
+  → Smooth alpha channel edges
+
+Can Only See One Side?
+  → Code auto-disables backface culling
+  → Both sides should be visible
+  → Check camera position
+
+
+PERFORMANCE TIPS
+----------------
+Recommended Sizes:
+  - Small icons: 128x128 to 256x256
+  - Character sprites: 512x512 to 1024x1024
+  - Large overlays: 1024x1024 to 2048x2048
+  - Maximum: 4096x4096 (GPU dependent)
+
+Optimization:
+  - Trim excess transparent space
+  - Use smallest size that looks good
+  - Compress with PNG optimization tools
+  - Keep frame count reasonable
+
+
+SAVING & LOADING
+----------------
+✓ Transparency preserved when saving (CTRL+S)
+✓ PNG paths saved in .dat file
+✓ Textures reloaded on load (CTRL+L)
+✓ Alpha channel automatically restored
+✓ Keep PNG files at original paths!
+
+
+BEST PRACTICES
+--------------
+1. Use descriptive filenames (char_walk_01.png)
+2. Keep all animation frames same size
+3. Store PNGs in project folder
+4. Test transparency before importing
+5. Create planes back-to-front for proper overlap
+6. Use billboard mode for camera-facing sprites
+7. Adjust frame timing for smooth animation
+
+
+SUPPORTED FORMATS
+-----------------
+PNG  : Full alpha support ✓
+JPG  : No transparency (opaque)
+BMP  : No transparency (opaque)
+TGA  : May work (untested)
+
+
+COMMON USES
+-----------
+✓ Character sprites and animations
+✓ UI elements in 3D space (health bars, markers)
+✓ Particle effects (fire, smoke, explosions)
+✓ Decals and overlays (signs, posters)
+✓ Transparent windows/glass effects
+✓ Icons and indicators
+✓ Special effects and highlights
+
+
+VERIFICATION
+------------
+After adding transparent PNG, check:
+  □ Transparent areas are see-through
+  □ Colors look correct (not too dark)
+  □ No black/white halo around edges
+  □ Visible from both front and back
+  □ Smooth edges (no jaggedness)
+  □ Animation plays smoothly (if multiple frames)
+
+
+EXAMPLE WORKFLOW
+----------------
+1. Create sprite sheet in Photoshop
+2. Export frames as separate PNGs with transparency
+3. Name files: sprite_01.png, sprite_02.png, etc.
+4. Launch application
+5. Press 'A' to open Animation UI
+6. Drag all PNG files onto window
+7. Enable "Billboard" mode
+8. Set frame time to 0.1 seconds
+9. Position sprite in scene
+10. Press CTRL+S to save
+11. Sprite with transparency preserved!
+
+
+FAQ
+---
+Q: Do I need special settings for transparency?
+A: No! Just use PNG files with alpha. It works automatically.
+
+Q: Can I use semi-transparent PNGs?
+A: Yes! All alpha values (0-255) are supported.
+
+Q: Does transparency work in billboard mode?
+A: Yes! Perfect for camera-facing sprites.
+
+Q: Will planes work after saving and loading?
+A: Yes! Transparency is fully preserved.
+
+Q: Can I see the plane from both sides?
+A: Yes! Both front and back faces are rendered.
+
+
+WHAT'S NEW
+----------
+✓ rlSetBlendMode(BLEND_ALPHA) enabled for proper blending
+✓ rlDisableBackfaceCulling() for double-sided rendering
+✓ Automatic alpha channel detection and preservation
+✓ Full save/load support with transparency intact
+
+
+CONFIRMED WORKING
+-----------------
+✓ Full alpha channel support
+✓ Semi-transparent pixels
+✓ Double-sided visibility
+✓ Billboard mode compatibility
+✓ Save/load preservation
+✓ Smooth blending with background
+✓ No performance issues
+
+
+================================================================================
+                    JUST DROP PNGs AND ENJOY!
+================================================================================

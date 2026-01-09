@@ -1,0 +1,165 @@
+================================================================================
+                    TEXTURE SAVE/LOAD - QUICK REFERENCE
+================================================================================
+
+PROBLEM SOLVED
+--------------
+Textures on walls were not being restored when loading saved projects.
+This is now FIXED with automatic wall detection!
+
+
+WHAT WAS WRONG
+--------------
+- Saved .obj files had vertices and connections but no wall faces
+- Loading would create 0 walls, so textures couldn't be applied
+- Console showed: "Module/Wall index out of range (modules: 1, walls in module: 0)"
+
+
+WHAT'S FIXED
+------------
+✓ System now auto-detects walls from node connections on load
+✓ Finds closed polygons (triangles, quads, etc.) in the connection graph
+✓ Validates they're coplanar (flat surfaces)
+✓ Creates walls automatically
+✓ Textures are then applied to the recreated walls
+
+
+HOW TO USE
+----------
+
+SAVING (CTRL+S):
+  1. Create your model with nodes and connections
+  2. Apply textures to walls (using texture library)
+  3. Press CTRL+S
+  4. Enter filename (without extension)
+  5. Click SAVE
+  → Creates: filename.obj, filename.mtl, filename.dat
+
+
+LOADING (CTRL+L):
+  1. Press CTRL+L
+  2. Enter filename (without extension)
+  3. Click LOAD
+  → Imports geometry, auto-detects walls, restores textures
+
+
+CONSOLE OUTPUT
+--------------
+
+When loading, you'll see:
+
+  "Successfully imported OBJ: X vertices, Y connections, 0 walls"
+  "No faces found in OBJ, attempting to auto-detect walls from connections..."
+  "Auto-detected Z walls from node connections"
+  "Applied textures to Z walls"
+
+If you see this, the system is working correctly!
+
+
+ANIMATED PLANES
+---------------
+Animated planes (PNG textures on quads) are saved/loaded separately:
+  - Position, size, frame timing all preserved
+  - Texture files must exist at saved paths
+  - See ANIMATED_PLANES_SAVE_LOAD.md for details
+
+
+TROUBLESHOOTING
+---------------
+
+"Applied textures to 0 walls"
+  → No coplanar closed polygons found in connections
+  → Check that your geometry has proper closed cycles
+  → Manually create walls if needed
+
+"Texture not found"
+  → Texture files moved or deleted since save
+  → Keep textures in project folder
+  → Use absolute paths (automatic)
+
+"Auto-detected 0 walls"
+  → No closed polygon cycles in the connection graph
+  → Model may be just loose edges
+  → Manually add walls or fix connectivity
+
+
+TECHNICAL NOTES
+---------------
+
+Wall Detection Algorithm:
+  - Searches for closed cycles (3-6 vertices)
+  - Checks coplanarity (tolerance: 0.5 units)
+  - Removes duplicates (same polygon, different starting point)
+  - Creates Wall objects with empty texture slots
+  - Texture mappings from .dat file are then applied
+
+Files Created on Save:
+  - .obj: Geometry (vertices, lines, faces)
+  - .mtl: Material library (texture references)
+  - .dat: Project data (textures, walls, planes)
+
+Load Order:
+  1. Import .obj (nodes, connections, faces)
+  2. Auto-detect walls if needed
+  3. Load .dat (texture library)
+  4. Apply texture mappings to walls
+  5. Load animated planes
+
+
+KEYBOARD SHORTCUTS
+------------------
+CTRL+S  : Save project
+CTRL+L  : Load project
+T       : Toggle texture library UI
+A       : Toggle animated planes UI
+
+
+CONFIRMED WORKING
+-----------------
+✓ Wall textures save and restore
+✓ Automatic wall detection from connections
+✓ Texture library preservation
+✓ Animated planes with textures
+✓ Multiple textures per project
+✓ Full project state restoration
+
+
+LIMITATIONS
+-----------
+- Polygons limited to 3-6 vertices (triangles through hexagons)
+- Texture files must remain at saved paths
+- Dense meshes may take longer to process
+- Only simple (non-self-intersecting) polygons supported
+
+
+EXAMPLE WORKFLOW
+----------------
+1. Create cube geometry (nodes + connections)
+2. Apply wood texture to wall
+3. Add animated plane with PNG sequence
+4. CTRL+S → save as "myproject"
+5. Close application
+6. Reopen application
+7. CTRL+L → load "myproject"
+8. ✓ Cube appears with wood texture
+9. ✓ Animated plane appears with PNG textures
+
+
+VERIFICATION
+------------
+Check console for these success messages:
+  ✓ "Auto-detected X walls from node connections"
+  ✓ "Applied texture to wall (Texture ID: X)"
+  ✓ "Applied textures to X walls"
+  ✓ "Total animated planes loaded: X"
+
+
+SUPPORT FILES
+-------------
+TEXTURE_SAVE_LOAD_FIX.md - Detailed technical explanation
+ANIMATED_PLANES_SAVE_LOAD.md - Animated planes documentation
+
+
+================================================================================
+                                    ENJOY!
+================================================================================
